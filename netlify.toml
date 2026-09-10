@@ -1,0 +1,11 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# React Router serves routes like /browse and /items/:id client-side only —
+# without this, a hard refresh or direct link on those paths 404s because
+# Netlify looks for a matching file/folder first.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
