@@ -137,8 +137,8 @@ GitHub 저장소만 연결하면 이후 push할 때마다 자동으로 다시 �
 
 1. [Netlify](https://app.netlify.com)에서 Add new site → Import an existing project →
    GitHub → 이 저장소 선택
-2. Base directory: `academic_continuity_system` (저장소 루트에 이 폴더와 `server/`가
-   함께 있는 구조라면 반드시 지정해야 합니다)
+2. Base directory: 비워두기 (이 저장소는 `academic_continuity_system` 자체가
+   루트라서 별도 지정이 필요 없습니다)
 3. Build command / Publish directory는 저장소에 포함된 `netlify.toml`이 자동으로
    잡아줍니다 (`npm run build` / `dist`). 이 파일에는 React Router용 SPA 리다이렉트
    설정도 같이 들어있어서, `/browse`나 `/items/:id`를 새로고침해도 404가 나지 않습니다.
