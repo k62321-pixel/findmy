@@ -1,7 +1,21 @@
 export type CategoryId = 'electronics' | 'clothing' | 'wallet' | 'books' | 'etc'
 
-/** 보관중 = still at the lost & found desk, 반환완료 = handed back to its owner. */
-export type ItemStatus = 'stored' | 'returned'
+/**
+ * 보관중 = at the lost & found desk, 수령 신청됨 = someone asked to pick it up,
+ * 반환완료 = an admin confirmed the handover.
+ */
+export type ItemStatus = 'stored' | 'requested' | 'returned'
+
+/** Only present when the signed-in user is an admin (ADMIN_EMAILS on the server). */
+export interface ItemAdminInfo {
+  reporterName: string
+  reporterEmail: string
+  claimantName: string | null
+  claimantEmail: string | null
+  claimedAt: string | null
+  resolvedBy: string | null
+  resolvedAt: string | null
+}
 
 export interface LostItem {
   id: string
@@ -18,6 +32,9 @@ export interface LostItem {
   imageUrl?: string
   /** True for items the signed-in user reported themselves. */
   reportedByMe?: boolean
+  /** True when the signed-in user is the one who requested pickup. */
+  claimedByMe?: boolean
+  admin?: ItemAdminInfo
 }
 
 export interface Category {

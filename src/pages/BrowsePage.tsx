@@ -5,6 +5,7 @@ import { CategoryFilter } from '../components/CategoryFilter'
 import { EmptyState } from '../components/EmptyState'
 import { Icon } from '../components/Icon'
 import { ItemRow } from '../components/ItemRow'
+import { LoadError } from '../components/LoadError'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 import { SearchField } from '../components/SearchField'
 import { filterItems } from '../lib/filter'
@@ -50,6 +51,8 @@ export function BrowsePage() {
 
         {status === 'loading' ? (
           <LoadingSpinner />
+        ) : status === 'error' ? (
+          <LoadError />
         ) : results.length > 0 ? (
           results.map((item) => <ItemRow key={item.id} item={item} />)
         ) : (

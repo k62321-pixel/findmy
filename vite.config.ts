@@ -10,7 +10,8 @@ export default defineConfig({
     // and the session cookie works without extra CORS/SameSite juggling.
     proxy: {
       '/api': {
-        target: 'http://localhost:4000',
+        // 127.0.0.1, not localhost: Node may resolve localhost to ::1 while Flask binds IPv4 only.
+        target: 'http://127.0.0.1:4000',
         changeOrigin: true,
       },
     },

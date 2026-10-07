@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import { Icon } from './Icon'
+import { useAuth } from '../store/AuthProvider'
 
 const TABS = [
   { to: '/', label: 'Home', icon: 'home', end: true },
@@ -7,11 +8,16 @@ const TABS = [
   { to: '/my-items', label: 'My Items', icon: 'inventory_2', end: false },
 ]
 
+const ADMIN_TAB = { to: '/admin', label: 'Admin', icon: 'admin_panel_settings', end: false }
+
 export function BottomNav() {
+  const { user } = useAuth()
+  const tabs = user?.isAdmin ? [...TABS, ADMIN_TAB] : TABS
+
   return (
     <nav className="fixed inset-x-0 bottom-0 z-50 bg-surface/90 pb-safe shadow-bar-top backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-container items-center justify-around px-margin-mobile">
-        {TABS.map((tab) => (
+        {tabs.map((tab) => (
           <NavLink
             key={tab.to}
             to={tab.to}

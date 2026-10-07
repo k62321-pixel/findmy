@@ -63,7 +63,7 @@ export function AppHeader({ title, back = false, actions = true }: AppHeaderProp
                 <button
                   type="button"
                   onClick={() => logout()}
-                  className="hidden font-label-sm text-label-sm text-on-surface-variant transition-colors hover:text-on-surface sm:inline"
+                  className="font-label-sm text-label-sm text-on-surface-variant transition-colors hover:text-on-surface"
                 >
                   로그아웃
                 </button>

@@ -10,7 +10,7 @@ interface ClaimDialogProps {
   error?: string
 }
 
-/** Level 2 surface (DESIGN.md › Elevation): confirms a pickup before marking the item returned. */
+/** Level 2 surface (DESIGN.md › Elevation): confirms a pickup request (staff confirm the actual return). */
 export function ClaimDialog({ item, onClose, onConfirm, submitting = false, error }: ClaimDialogProps) {
   const confirmRef = useRef<HTMLButtonElement>(null)
 
@@ -44,8 +44,8 @@ export function ClaimDialog({ item, onClose, onConfirm, submitting = false, erro
             수령을 신청할까요?
           </h2>
           <p className="font-body-md text-body-md text-on-surface-variant">
-            <strong className="text-on-surface">{item.name}</strong> 수령을 신청합니다. {item.storage}에서 학생증을
-            제시하면 본인 확인 후 물건을 받을 수 있습니다.
+            <strong className="text-on-surface">{item.name}</strong> 수령을 신청합니다. 신청 후 {item.storage}에
+            학생증을 지참해 방문하면, 담당자가 본인 확인 후 물건을 돌려드립니다.
           </p>
         </div>
 

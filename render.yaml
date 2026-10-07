@@ -1,0 +1,34 @@
+# Render Blueprint — New → Blueprint → pick this repo.
+# Values marked sync: false are prompted for in the dashboard (never commit them).
+services:
+  - type: web
+    name: found-it-api
+    runtime: python
+    rootDir: server
+    # The free plan has no persistent disk: items.db and photos are wiped on every
+    # redeploy/restart. For real use switch to "starter" and uncomment the disk below.
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4
+    healthCheckPath: /api/items
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: FLASK_ENV
+        value: production
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: FRONTEND_ORIGIN
+        sync: false
+      - key: ADMIN_EMAILS
+        sync: false
+      - key: ALLOWED_EMAIL_DOMAINS
+        sync: false
+    #   - key: DATA_DIR
+    #     value: /var/data
+    # disk:
+    #   name: found-it-data
+    #   mountPath: /var/data
+    #   sizeGB: 1

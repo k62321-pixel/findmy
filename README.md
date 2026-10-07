@@ -14,8 +14,8 @@ cd server
 python -m venv .venv
 ./.venv/Scripts/activate      # macOS/Linux: source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env          # GOOGLE_CLIENT_ID, SESSION_SECRET 채우기
-python app.py                 # http://localhost:4000
+cp .env.example .env          # GOOGLE_CLIENT_ID, SESSION_SECRET, ADMIN_EMAILS 채우기
+python app.py                 # http://127.0.0.1:4000
 ```
 
 **2. 프론트엔드 (Vite)**
@@ -28,8 +28,11 @@ npm run build                 # 타입 체크 + 프로덕션 빌드
 npm run preview               # 빌드 결과 확인
 ```
 
-`vite.config.ts`의 `server.proxy`가 `/api/*` 요청을 `http://localhost:4000`(Flask)으로 넘겨주므로,
+`vite.config.ts`의 `server.proxy`가 `/api/*` 요청을 `http://127.0.0.1:4000`(Flask)으로 넘겨주므로,
 브라우저 입장에서는 프론트/백엔드가 같은 오리진으로 보여 세션 쿠키가 문제없이 동작합니다.
+
+Flask는 기본적으로 `127.0.0.1`에만 열리고 디버그 모드도 꺼져 있습니다. 로컬에서
+디버거가 필요하면 `server/.env`에 `FLASK_DEBUG=1`을 넣으세요(네트워크에 노출 금지).
 
 ## 화면
 
@@ -37,9 +40,10 @@ npm run preview               # 빌드 결과 확인
 | --- | --- | --- |
 | `/` | 홈 — 히어로, 등록/찾기 버튼, 검색, 최근 습득물 그리드 | `_1` |
 | `/browse` | 목록 — 검색, 카테고리 칩 필터, 습득물 리스트 | `_2` |
-| `/items/:id` | 상세 — 사진, 상태/카테고리 칩, 습득 정보, 수령 신청 | `_3` |
+| `/items/:id` | 상세 — 사진, 상태/카테고리 칩, 습득 정보, 수령 신청, (관리자) 관리 패널 | `_3` |
 | `/report` | 신고 — 물품명·카테고리·장소·사진·추가 정보 폼 | `_4` |
-| `/my-items` | 내 신고 내역 — 보관중 / 반환완료 탭 | 신규 |
+| `/my-items` | 내 물건 — 신고한 물건 / 수령 신청 탭 | 신규 |
+| `/admin` | 관리 — 수령 신청 / 보관중 / 반환완료 탭 (관리자만) | 신규 |
 | `/login` | 로그인 | `_5` |
 
 ## 구조
@@ -48,18 +52,19 @@ npm run preview               # 빌드 결과 확인
 src/
   components/   AppShell, AppHeader, BottomNav, ItemCard, ItemRow,
                 SearchField, CategoryFilter, StatusChip, ItemThumb,
-                ClaimDialog, EmptyState, Icon, ProtectedRoute
-  pages/        Home, Browse, ItemDetail, Report, MyItems, Login
+                ClaimDialog, EmptyState, LoadError, Icon, ProtectedRoute
+  pages/        Home, Browse, ItemDetail, Report, MyItems, Admin, Login
   store/        AuthProvider — 로그인 상태(/api/me, /api/auth/google, /api/logout)
-                ItemsProvider — 습득물 목록 상태 + localStorage 영속화
-  lib/          categories, format(날짜 표기), filter(검색·정렬), api(백엔드 URL 조립)
-netlify.toml    Netlify 빌드 설정 + SPA 라우팅 리다이렉트
+                ItemsProvider — 습득물 목록 상태 + 신고/수령 신청/관리자 액션
+  lib/          categories, format(날짜 표기), filter(검색·정렬), api(백엔드 URL·오류 메시지)
+netlify.toml    Netlify 빌드 설정 + /api 프록시 + SPA 라우팅 리다이렉트
+render.yaml     Render Blueprint (백엔드 배포 설정)
 server/
   app.py            Flask 서버 — 인증(Google ID 토큰 검증 → 세션 쿠키) + 습득물 API
-  db.py             SQLite 스키마 · 커넥션 헬퍼
+  db.py             SQLite 스키마 · 마이그레이션 · 커넥션 헬퍼
   items.db          습득물 데이터 (SQLite, .gitignore 처리됨, 최초 실행 시 자동 생성)
   uploads/          신고 사진 원본 파일 (.gitignore 처리됨)
-  Procfile          배포 시작 명령 (Render 등에서 인식: gunicorn app:app)
+  Procfile          배포 시작 명령 (gunicorn app:app)
   requirements.txt
   .env / .env.example
 ```
@@ -69,101 +74,88 @@ server/
 **흐름**: 프론트의 `<GoogleLogin>` 버튼(`@react-oauth/google`)이 Google과 통신해
 ID 토큰(JWT)을 받아온다 → `AuthProvider.loginWithGoogle`이 그 토큰을
 `POST /api/auth/google`로 Flask에 보낸다 → Flask가 `google-auth` 라이브러리로
-토큰 서명·발급자·audience(클라이언트 ID)를 검증한다 → 검증에 성공하면 Flask가
-자체 세션(JWT)을 서명해 httpOnly 쿠키(`acs_session`)로 내려준다 → 이후 요청은
-이 쿠키만으로 `/api/me`가 로그인 사용자를 돌려준다. 브라우저는 구글 ID 토큰을
-직접 들고 있지 않고, Flask가 검증한 결과만 신뢰한다.
+토큰 서명·발급자·audience(클라이언트 ID)를 검증하고, 이메일 도메인이
+`ALLOWED_EMAIL_DOMAINS`에 속하는지 확인한다 → 통과하면 Flask가 자체 세션(JWT)을
+서명해 httpOnly 쿠키(`acs_session`)로 내려준다 → 이후 요청은 이 쿠키만으로
+`/api/me`가 로그인 사용자(+`isAdmin`)를 돌려준다.
 
-**로그인이 필요한 화면**: `/report`(습득물 신고), `/my-items`(내 신고 내역),
-그리고 상세 페이지의 "내 물건 찾기" 수령 신청. `ProtectedRoute`가 미로그인
-사용자를 `/login`으로 보내고, 로그인 성공 후 원래 가려던 경로로 돌려보냅니다.
+**로그인이 필요한 화면**: `/report`, `/my-items`, `/admin`, 그리고 상세 페이지의
+"내 물건 찾기" 수령 신청. `ProtectedRoute`가 미로그인 사용자를 `/login`으로 보내고,
+로그인 성공 후 원래 가려던 경로로 돌려보냅니다.
 
 **필수 설정 — Google Cloud Console**: 사용 중인 OAuth 클라이언트 ID의
-"승인된 자바스크립트 원본(Authorized JavaScript origins)"에 `http://localhost:5173`이
-등록되어 있어야 로그인 버튼이 동작합니다. 없으면 `redirect_uri_mismatch` /
-origin 오류가 발생합니다.
+"승인된 자바스크립트 원본(Authorized JavaScript origins)"에 `http://localhost:5173`과
+배포 주소가 등록되어 있어야 로그인 버튼이 동작합니다.
 
 **환경 변수**:
 - 프론트 `.env` → `VITE_GOOGLE_CLIENT_ID` (공개 값, 시크릿 아님)
-- 서버 `server/.env` → `GOOGLE_CLIENT_ID`(동일 값), `SESSION_SECRET`(무작위 문자열,
-  절대 커밋하지 말 것), `FRONTEND_ORIGIN`, `PORT`
+- 서버 `server/.env`
+  - `GOOGLE_CLIENT_ID` (프론트와 동일 값)
+  - `SESSION_SECRET` (32자 이상 무작위 문자열, 절대 커밋하지 말 것)
+  - `FRONTEND_ORIGIN` (프론트 주소, 쉼표로 여러 개)
+  - `ADMIN_EMAILS` — 반환완료 처리 권한이 있는 관리자 이메일(쉼표로 여러 개)
+  - `ALLOWED_EMAIL_DOMAINS` — 로그인 허용 도메인, 예: `school.ac.kr` (비우면 모든 구글 계정 허용, 관리자 이메일은 항상 허용)
+  - `DATA_DIR` — DB와 사진 저장 위치 (배포 시 영구 디스크 경로)
 
-두 `.env` 모두 `.gitignore`에 포함되어 있고, `.env.example`에 채워야 할 키만
-남겨두었습니다.
+## 권한과 수령 흐름
 
-## 습득물 데이터 (서버 저장)
+| 상태 | 의미 | 바꿀 수 있는 사람 |
+| --- | --- | --- |
+| `stored` 보관중 | 분실물 센터에 보관 중 | — |
+| `requested` 수령 신청됨 | 누군가 "내 물건 찾기"로 신청함 | 로그인 사용자 누구나 (보관중 → 신청, 본인 신청 취소) |
+| `returned` 반환완료 | 담당자가 본인 확인 후 돌려줌 | **관리자(`ADMIN_EMAILS`)만** |
 
-신고/목록 조회/수령 신청이 전부 Flask API를 통해 SQLite(`server/items.db`)에
-저장됩니다. 로그인한 사용자라면 어떤 브라우저·기기로 접속해도 같은 목록을 봅니다.
+관리자는 상세 페이지의 관리 패널에서 반환완료 처리 / 신청 거절 / 보관중으로 되돌리기 /
+게시물 삭제를 할 수 있고, 신고자·신청자 이름과 이메일을 볼 수 있습니다(일반 사용자에게는
+내려가지 않음). 관리자 여부는 매 요청마다 서버가 `ADMIN_EMAILS`로 다시 판단하므로, 목록에서
+이메일을 빼면 즉시 권한이 사라집니다.
 
-- `GET /api/items` — 전체 목록 (공개). 로그인 상태면 각 항목에 내가 신고했는지(`reportedByMe`)가 함께 내려옵니다.
-- `GET /api/items?mine=1` — 내가 신고한 것만 (로그인 필요)
+## 습득물 API
+
+- `GET /api/items` — 전체 목록 (공개). 로그인 상태면 `reportedByMe`/`claimedByMe`, 관리자면 `admin` 상세가 함께 내려옵니다.
+- `GET /api/items?mine=1` — 내가 신고했거나 신청한 것만 (로그인 필요)
 - `GET /api/items/<id>` — 단건 조회 (공개)
-- `POST /api/items` — 신고 등록 (로그인 필요). `multipart/form-data`로 `name`, `category`,
-  `location`, `description`(선택), `photo`(선택, 이미지 파일)를 받습니다.
-- `POST /api/items/<id>/claim` — 수령 신청 → 상태를 `반환완료`로 변경 (로그인 필요)
-- `GET /api/uploads/<filename>` — 업로드된 사진 원본 (공개)
+- `POST /api/items` — 신고 등록 (로그인 필요, 1시간 10건 제한). `multipart/form-data`로 `name`(≤100자),
+  `category`, `location`(≤200자), `description`(선택, ≤1000자), `photo`(선택)를 받습니다.
+- `POST /api/items/<id>/claim` — 수령 신청 → `requested` (로그인 필요, 본인 신고 물건 불가)
+- `POST /api/items/<id>/claim/cancel` — 내 수령 신청 취소 → `stored`
+- `POST /api/items/<id>/status` — **관리자** `{"status": "returned" | "stored"}`
+- `DELETE /api/items/<id>` — **관리자** 게시물·사진 삭제
+- `GET /api/uploads/<filename>` — 업로드된 사진 (공개)
 
-사진은 서버의 `server/uploads/`에 `uuid` 파일명으로 저장되고, DB에는 파일명만
-남습니다. 원본 파일명은 버리고 확장자(`.png/.jpg/.jpeg/.gif/.webp`)만 검사한
-뒤 저장하며, 요청 크기는 8MB로 제한됩니다(그 이상은 `413 file_too_large`).
+사진은 파일명·확장자를 믿지 않고 파일 앞부분 바이트로 PNG/JPEG/GIF/WEBP인지 확인한 뒤
+`uuid` 파일명으로 저장합니다. 요청 크기는 8MB로 제한됩니다(`413 file_too_large`).
 
-## 외부 호스팅 (Render + Netlify)
+**보안 장치**: 쓰기 요청은 `Origin` 헤더가 `FRONTEND_ORIGIN`이 아니면 거부(CSRF 방지),
+모든 응답에 `X-Content-Type-Options: nosniff`, 로그아웃 시 쿠키를 같은 속성으로 삭제.
 
-데모/테스트 용도로 가장 간단한 조합입니다. 둘 다 무료 티어로 시작할 수 있고,
-GitHub 저장소만 연결하면 이후 push할 때마다 자동으로 다시 빌드·배포됩니다.
-**먼저 이 프로젝트를 GitHub 저장소로 push해두세요.**
+## 배포 (Render + Netlify)
 
-> Render 무료 티어는 디스크가 영구적이지 않습니다 — 서비스를 재배포하거나
-> 오래 쉬었다 깨어나면 `server/items.db`와 `server/uploads/`가 초기화될 수
-> 있습니다. 데모용으로는 괜찮지만, 데이터를 계속 남기고 싶다면 Render의 유료
-> Persistent Disk를 추가하거나 S3/Cloudflare R2 같은 외부 스토리지로 옮겨야
-> 합니다.
+Netlify가 `/api/*`를 Render로 **프록시**하므로 브라우저 입장에서는 한 도메인입니다.
+덕분에 사파리/iOS의 서드파티 쿠키 차단에 걸리지 않고, 쿠키는 `SameSite=Lax` 그대로 씁니다.
 
-**1. 백엔드 — Render**
+**1. 백엔드 — Render (Blueprint)**
 
-1. [Render](https://render.com)에서 New → Web Service → 이 저장소 선택, 루트 디렉터리를 `server`로 지정
-2. Build Command: `pip install -r requirements.txt`
-3. Start Command: `gunicorn app:app --bind 0.0.0.0:$PORT` (또는 `server/Procfile`을 그대로 인식)
-4. 환경 변수 추가:
-   - `GOOGLE_CLIENT_ID` — 쓰고 있는 클라이언트 ID
-   - `SESSION_SECRET` — 무작위 문자열 (로컬 `.env`와 다른 값 권장)
-   - `FRONTEND_ORIGIN` — 2번에서 나올 Netlify 주소, 예: `https://found-it.netlify.app`
-   - `FLASK_ENV` = `production`
-   - `SESSION_COOKIE_SAMESITE` = `None` (프론트/백엔드가 다른 도메인이라 필수)
-5. 배포되면 나오는 주소를 기억해두세요, 예: `https://found-it-api.onrender.com`
+1. Render → New → Blueprint → 이 저장소 선택 (`render.yaml` 자동 인식)
+2. 물어보는 환경 변수 입력: `GOOGLE_CLIENT_ID`, `FRONTEND_ORIGIN`(Netlify 주소),
+   `ADMIN_EMAILS`, `ALLOWED_EMAIL_DOMAINS`. `SESSION_SECRET`은 자동 생성됩니다.
+3. 배포 후 나온 주소(예: `https://found-it-api.onrender.com`)를 `netlify.toml`의
+   `/api/*` 프록시 대상에 넣고 push.
+
+> **무료 플랜은 디스크가 영구적이지 않습니다** — 재배포·재시작 시 DB와 사진이 초기화됩니다.
+> 실제 운영이라면 `render.yaml`에서 `plan: starter`로 바꾸고 `disk`와 `DATA_DIR` 주석을 해제하세요(유료).
+> 무료 플랜은 15분간 요청이 없으면 잠들고, 깨어나는 데 30초~1분 걸려 첫 요청이 실패할 수 있습니다
+> (화면에 "다시 시도" 버튼이 나옵니다).
 
 **2. 프론트엔드 — Netlify**
 
-1. [Netlify](https://app.netlify.com)에서 Add new site → Import an existing project →
-   GitHub → 이 저장소 선택
-2. Base directory: 비워두기 (이 저장소는 `academic_continuity_system` 자체가
-   루트라서 별도 지정이 필요 없습니다)
-3. Build command / Publish directory는 저장소에 포함된 `netlify.toml`이 자동으로
-   잡아줍니다 (`npm run build` / `dist`). 이 파일에는 React Router용 SPA 리다이렉트
-   설정도 같이 들어있어서, `/browse`나 `/items/:id`를 새로고침해도 404가 나지 않습니다.
-4. Site settings → Environment variables에 추가:
-   - `VITE_GOOGLE_CLIENT_ID` — 쓰고 있는 클라이언트 ID
-   - `VITE_API_BASE_URL` — 1번에서 나온 Render 주소, 예: `https://found-it-api.onrender.com`
-5. 배포되면 나오는 주소(예: `https://found-it.netlify.app`)를 Render의
-   `FRONTEND_ORIGIN`에 반영 (순환 참조이므로 둘 다 배포한 뒤 서로의 주소로
-   환경 변수를 채워 넣고 한 번씩 재배포하면 됩니다)
+1. Netlify → Add new site → Import an existing project → GitHub → 이 저장소
+2. 빌드 설정은 `netlify.toml`이 자동으로 잡습니다 (`npm run build` / `dist`)
+3. Environment variables: `VITE_GOOGLE_CLIENT_ID`만 넣으면 됩니다 (`VITE_API_BASE_URL`은 비워두기)
 
 **3. Google Cloud Console**
 
-승인된 자바스크립트 원본에 배포된 Netlify 주소(`https://found-it.netlify.app`)를
-추가하세요. `http://localhost:5173`은 로컬 개발용으로 그대로 남겨둬도 됩니다.
-
-**로컬 개발은 그대로 동작합니다** — `VITE_API_BASE_URL`을 비워두면(`.env`
-기본값) Vite의 `/api` 프록시가 계속 쓰이므로, 이 배포 설정과 무관하게
-`npm run dev` + `python app.py` 조합이 그대로 유지됩니다.
-
-**Git 연동 없이 바로 올려보고 싶다면**: Netlify Drop(app.netlify.com/drop)이나
-Vercel의 "Drag & Drop" 페이지에 로컬에서 `npm run build`로 만든 `dist` 폴더를
-끌어다 놓으면 즉시 배포됩니다. 다만 이 경우 코드를 고칠 때마다 다시 빌드해서
-수동으로 올려야 하고(자동 재배포 없음), 환경 변수(`VITE_GOOGLE_CLIENT_ID`,
-`VITE_API_BASE_URL`)는 올리기 전에 로컬 `.env`에 미리 설정해 둔 값으로 빌드에
-그대로 박혀 들어갑니다.
+승인된 자바스크립트 원본에 Netlify 주소를 추가하세요.
 
 ## 디자인 토큰
 
@@ -175,20 +167,3 @@ Vercel의 "Drag & Drop" 페이지에 로컬에서 `npm run build`로 만든 `dis
 - 타이포: 패밀리와 크기가 분리되어 있어 `font-label-md text-label-md`처럼 함께 사용합니다.
 - 그림자: `shadow-level1`(카드), `shadow-level1-hover`(호버), `shadow-level2`(모달)
 - 모양: 입력·썸네일 `rounded`(8px), 카드·컨테이너 `rounded-lg`(16px), 상태 칩 `rounded-full`
-
-## 동작 방식 메모
-
-- 습득물 데이터는 `ItemsProvider`가 Flask API(`/api/items`)로 읽고 쓰며,
-  실제 저장은 `server/items.db`(SQLite)에서 이루어집니다. `localStorage`는
-  더 이상 쓰지 않습니다. 서버를 새로 띄우면(=`items.db`가 없으면) 빈 목록으로
-  시작하고, 샘플/데모 습득물은 들어있지 않습니다.
-- 첨부 사진은 신고 제출 시 실제 서버 업로드(`multipart/form-data`)로 전송되어
-  `server/uploads/`에 저장됩니다. 미리보기(`URL.createObjectURL`)는 그 파일을
-  서버에 올리기 전 화면에 보여주는 용도일 뿐이고, 실제 데이터는 서버 응답의
-  `imageUrl`(`/api/uploads/<파일명>`)을 씁니다.
-- 로그인은 Google 공식 버튼(`@react-oauth/google`)을 그대로 사용합니다. 원본
-  목업의 Google 계정 화면을 흉내 낸 커스텀 UI는 실제 OAuth 버튼으로 교체했습니다.
-- 세션은 Flask가 서명한 JWT를 담은 httpOnly 쿠키 하나로 관리합니다. 별도 DB나
-  세션 스토어는 없어서 서버를 재시작해도 `SESSION_SECRET`이 같으면 기존 쿠키가
-  유효합니다. 사용자 정보(sub/email/name/picture)는 항상 최신 Google 프로필을
-  다시 검증한 값이며 별도로 저장하지 않습니다.

@@ -7,7 +7,7 @@ import { formatFoundAt } from '../lib/format'
 import type { LostItem } from '../types'
 
 /** List row — the browse/feed variant of the card. */
-export function ItemRow({ item }: { item: LostItem }) {
+export function ItemRow({ item, note }: { item: LostItem; note?: string }) {
   const returned = item.status === 'returned'
 
   return (
@@ -38,6 +38,12 @@ export function ItemRow({ item }: { item: LostItem }) {
           <Icon name="schedule" size={14} />
           <span className="font-label-sm text-label-sm">{formatFoundAt(item.foundAt)}</span>
         </div>
+        {note ? (
+          <div className="mb-2 flex items-center gap-1.5 text-on-surface">
+            <Icon name="person" size={14} />
+            <span className="truncate font-label-sm text-label-sm">{note}</span>
+          </div>
+        ) : null}
         <span className="mt-auto w-fit rounded-sm bg-surface-container-highest px-2 py-1 font-label-sm text-label-sm text-on-surface-variant">
           {categoryOf(item.category).label}
         </span>

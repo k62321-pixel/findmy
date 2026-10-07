@@ -1,12 +1,14 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { apiUrl } from '../lib/api'
+import { apiUrl, responseError } from '../lib/api'
 
 export interface AuthUser {
   sub: string
   email: string
   name: string
   picture?: string
+  /** Decided by the server (ADMIN_EMAILS); the UI only uses it to show admin controls. */
+  isAdmin: boolean
 }
 
 type AuthStatus = 'loading' | 'signed-in' | 'signed-out'
@@ -51,7 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ credential }),
     })
-    if (!res.ok) throw new Error('구글 로그인에 실패했습니다.')
+    if (!res.ok) throw await responseError(res, '구글 로그인에 실패했습니다. 다시 시도해 주세요.')
     const data: { user: AuthUser } = await res.json()
     setUser(data.user)
     setStatus('signed-in')

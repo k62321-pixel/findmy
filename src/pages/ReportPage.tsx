@@ -6,6 +6,11 @@ import { CATEGORIES } from '../lib/categories'
 import { useItems } from '../store/ItemsProvider'
 import type { CategoryId } from '../types'
 
+// Listing concrete types (not image/*) makes iOS convert HEIC photos to JPEG on upload.
+const ACCEPTED_IMAGE_TYPES = 'image/jpeg,image/png,image/gif,image/webp'
+// Slightly under the server's 8MB request cap, leaving room for the other form fields.
+const MAX_PHOTO_BYTES = 7.5 * 1024 * 1024
+
 interface FormErrors {
   name?: string
   category?: string
@@ -60,6 +65,18 @@ export function ReportPage() {
   function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
+    // Some Android cameras report an empty type — let the server's byte check decide then.
+    if (file.type && !ACCEPTED_IMAGE_TYPES.split(',').includes(file.type)) {
+      setSubmitError('JPG, PNG, GIF, WEBP 이미지만 첨부할 수 있습니다.')
+      e.target.value = ''
+      return
+    }
+    if (file.size > MAX_PHOTO_BYTES) {
+      setSubmitError('사진 용량이 너무 큽니다. 8MB 이하로 올려 주세요.')
+      e.target.value = ''
+      return
+    }
+    setSubmitError('')
     if (photo) URL.revokeObjectURL(photo.previewUrl)
     setPhoto({ file, previewUrl: URL.createObjectURL(file) })
   }
@@ -86,6 +103,7 @@ export function ReportPage() {
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                maxLength={100}
                 placeholder="예: 검은색 애플워치"
                 className="h-12 w-full rounded bg-surface px-4 font-body-md text-body-md text-on-surface shadow-sm transition-shadow placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary"
               />
@@ -122,6 +140,7 @@ export function ReportPage() {
                   type="text"
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
+                  maxLength={200}
                   placeholder="예: 중앙도서관 2층 열람실"
                   className="h-full w-full rounded-r bg-transparent px-2 font-body-md text-body-md text-on-surface placeholder:text-outline focus:outline-none"
                 />
@@ -132,7 +151,7 @@ export function ReportPage() {
               <input
                 ref={fileRef}
                 type="file"
-                accept="image/*"
+                accept={ACCEPTED_IMAGE_TYPES}
                 capture="environment"
                 onChange={handlePhoto}
                 className="hidden"
@@ -173,6 +192,7 @@ export function ReportPage() {
                 rows={3}
                 value={details}
                 onChange={(e) => setDetails(e.target.value)}
+                maxLength={1000}
                 placeholder="특징이나 상태 등 도움이 될 만한 정보를 적어주세요."
                 className="w-full resize-none rounded bg-surface p-4 font-body-md text-body-md text-on-surface shadow-sm transition-shadow placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary"
               />

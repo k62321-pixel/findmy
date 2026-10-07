@@ -7,12 +7,17 @@ Two jobs:
 2. Persist reported items (and their photos) in SQLite so records survive
    across browsers/devices instead of living only in one client's
    localStorage.
+
+Item lifecycle: stored (보관중) → requested (수령 신청됨, by any signed-in user)
+→ returned (반환완료, only an admin listed in ADMIN_EMAILS can confirm this).
 """
 import os
+import threading
 import time
 import uuid
+from collections import defaultdict, deque
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
+from functools import wraps
 
 import jwt
 from dotenv import load_dotenv
@@ -20,38 +25,53 @@ from flask import Flask, jsonify, make_response, request, send_from_directory
 from flask_cors import CORS
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token
-from werkzeug.utils import secure_filename
-
-from db import get_connection, init_db
 
 load_dotenv()
 
+from db import DATA_DIR, get_connection, init_db  # noqa: E402 — DATA_DIR reads .env
+
+
+def _csv_env(name, default=""):
+    return [v.strip() for v in os.environ.get(name, default).split(",") if v.strip()]
+
+
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID")
 SESSION_SECRET = os.environ.get("SESSION_SECRET")
-FRONTEND_ORIGINS = [o.strip() for o in os.environ.get("FRONTEND_ORIGIN", "http://localhost:5173").split(",") if o.strip()]
+FRONTEND_ORIGINS = _csv_env("FRONTEND_ORIGIN", "http://localhost:5173")
+# Who may confirm returns / undo them / delete posts. Checked on every request,
+# so removing an address here revokes admin rights immediately.
+ADMIN_EMAILS = {e.lower() for e in _csv_env("ADMIN_EMAILS")}
+# Restrict sign-in to school accounts, e.g. "school.ac.kr". Empty = any Google account.
+ALLOWED_EMAIL_DOMAINS = {d.lower().lstrip("@") for d in _csv_env("ALLOWED_EMAIL_DOMAINS")}
+HOST = os.environ.get("HOST", "127.0.0.1")
 PORT = int(os.environ.get("PORT", 4000))
 IS_PRODUCTION = os.environ.get("FLASK_ENV") == "production"
+# Never on by default: the Werkzeug debugger allows running arbitrary code.
+DEBUG = os.environ.get("FLASK_DEBUG") == "1" and not IS_PRODUCTION
 
 if not GOOGLE_CLIENT_ID:
     raise RuntimeError("GOOGLE_CLIENT_ID is not set. Copy server/.env.example to server/.env and fill it in.")
 if not SESSION_SECRET:
     raise RuntimeError("SESSION_SECRET is not set. Copy server/.env.example to server/.env and fill it in.")
+if IS_PRODUCTION and len(SESSION_SECRET) < 32:
+    raise RuntimeError("SESSION_SECRET must be at least 32 characters in production.")
 
 SESSION_COOKIE = "acs_session"
 SESSION_TTL_SECONDS = int(timedelta(days=7).total_seconds())
 
-# Same-site deployment (local dev, or frontend+backend behind one domain) can use the
-# browser-default "Lax" cookie. Once the frontend lives on a different domain (e.g. a
-# Vercel + Render split), the cookie only survives cross-origin fetches as "None", which
-# in turn requires "Secure" — browsers reject SameSite=None without it.
+# Default deployment proxies /api through the frontend's domain (see netlify.toml), so
+# the cookie is first-party and "Lax" works everywhere, Safari included. Only a true
+# cross-domain setup needs "None", which in turn requires "Secure".
 COOKIE_SAMESITE = os.environ.get("SESSION_COOKIE_SAMESITE", "Lax")
 COOKIE_SECURE = IS_PRODUCTION or COOKIE_SAMESITE == "None"
 
-UPLOAD_DIR = Path(__file__).parent / "uploads"
+UPLOAD_DIR = DATA_DIR / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
-ALLOWED_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
 ALLOWED_CATEGORIES = {"electronics", "clothing", "wallet", "books", "etc"}
 DEFAULT_STORAGE_LOCATION = "학생회관 1층 분실물 센터"
+MAX_NAME_LENGTH = 100
+MAX_LOCATION_LENGTH = 200
+MAX_DESCRIPTION_LENGTH = 1000
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024  # 8MB, generous for a phone photo
@@ -60,10 +80,78 @@ CORS(app, supports_credentials=True, origins=FRONTEND_ORIGINS)
 _google_request = google_requests.Request()
 init_db()
 
+if not ALLOWED_EMAIL_DOMAINS:
+    app.logger.warning("ALLOWED_EMAIL_DOMAINS is empty — any Google account can sign in.")
+if not ADMIN_EMAILS:
+    app.logger.warning("ADMIN_EMAILS is empty — nobody can confirm returns.")
+
+
+# ---------------------------------------------------------------------------
+# Request hardening
+# ---------------------------------------------------------------------------
+
+@app.before_request
+def _reject_cross_site_writes():
+    # CSRF guard: browsers always attach Origin to cross-site POSTs (including plain
+    # HTML form submits), so a write from any page other than our frontend is refused.
+    if request.method in ("GET", "HEAD", "OPTIONS"):
+        return None
+    origin = request.headers.get("Origin")
+    if origin and origin not in FRONTEND_ORIGINS and origin != request.host_url.rstrip("/"):
+        return jsonify(error="forbidden_origin"), 403
+    return None
+
+
+@app.after_request
+def _security_headers(response):
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    return response
+
+
+_rate_lock = threading.Lock()
+_rate_hits = defaultdict(deque)
+
+
+def _rate_limited(key, limit, window_seconds):
+    """In-memory sliding window. Fine for a single gunicorn worker; resets on restart."""
+    now = time.monotonic()
+    with _rate_lock:
+        hits = _rate_hits[key]
+        while hits and now - hits[0] > window_seconds:
+            hits.popleft()
+        if len(hits) >= limit:
+            return True
+        hits.append(now)
+        return False
+
 
 # ---------------------------------------------------------------------------
 # Session helpers
 # ---------------------------------------------------------------------------
+
+def _email_allowed(email):
+    email = email.lower()
+    if email in ADMIN_EMAILS or not ALLOWED_EMAIL_DOMAINS:
+        return True
+    return email.rsplit("@", 1)[-1] in ALLOWED_EMAIL_DOMAINS
+
+
+def _is_admin(user):
+    return bool(user) and user["email"].lower() in ADMIN_EMAILS
+
+
+def _set_session_cookie(response, value, max_age):
+    # Deletion must repeat SameSite/Secure, or browsers ignore it on cross-site responses.
+    response.set_cookie(
+        SESSION_COOKIE,
+        value,
+        httponly=True,
+        samesite=COOKIE_SAMESITE,
+        secure=COOKIE_SECURE,
+        max_age=max_age,
+        path="/",
+    )
+
 
 def _issue_session(response, user):
     token = jwt.encode(
@@ -71,15 +159,7 @@ def _issue_session(response, user):
         SESSION_SECRET,
         algorithm="HS256",
     )
-    response.set_cookie(
-        SESSION_COOKIE,
-        token,
-        httponly=True,
-        samesite=COOKIE_SAMESITE,
-        secure=COOKIE_SECURE,
-        max_age=SESSION_TTL_SECONDS,
-        path="/",
-    )
+    _set_session_cookie(response, token, SESSION_TTL_SECONDS)
 
 
 def _current_user():
@@ -90,7 +170,40 @@ def _current_user():
         payload = jwt.decode(token, SESSION_SECRET, algorithms=["HS256"])
     except jwt.PyJWTError:
         return None
+    if not payload.get("sub") or not payload.get("email"):
+        return None
+    # Re-checked per request so tightening ALLOWED_EMAIL_DOMAINS takes effect at once.
+    if not _email_allowed(payload["email"]):
+        return None
     return {key: payload.get(key) for key in ("sub", "email", "name", "picture")}
+
+
+def _public_user(user):
+    return {**user, "isAdmin": _is_admin(user)}
+
+
+def login_required(view):
+    @wraps(view)
+    def wrapper(*args, **kwargs):
+        user = _current_user()
+        if not user:
+            return jsonify(error="unauthorized"), 401
+        return view(user, *args, **kwargs)
+
+    return wrapper
+
+
+def admin_required(view):
+    @wraps(view)
+    def wrapper(*args, **kwargs):
+        user = _current_user()
+        if not user:
+            return jsonify(error="unauthorized"), 401
+        if not _is_admin(user):
+            return jsonify(error="forbidden"), 403
+        return view(user, *args, **kwargs)
+
+    return wrapper
 
 
 @app.post("/api/auth/google")
@@ -107,6 +220,8 @@ def auth_google():
 
     if not payload.get("email_verified"):
         return jsonify(error="unverified_email"), 401
+    if not _email_allowed(payload["email"]):
+        return jsonify(error="domain_not_allowed"), 403
 
     user = {
         "sub": payload["sub"],
@@ -115,7 +230,7 @@ def auth_google():
         "picture": payload.get("picture"),
     }
 
-    response = make_response(jsonify(user=user))
+    response = make_response(jsonify(user=_public_user(user)))
     _issue_session(response, user)
     return response
 
@@ -125,13 +240,13 @@ def me():
     user = _current_user()
     if not user:
         return jsonify(user=None), 401
-    return jsonify(user=user)
+    return jsonify(user=_public_user(user))
 
 
 @app.post("/api/logout")
 def logout():
     response = make_response(jsonify(ok=True))
-    response.set_cookie(SESSION_COOKIE, "", expires=0, path="/")
+    _set_session_cookie(response, "", 0)
     return response
 
 
@@ -139,11 +254,13 @@ def logout():
 # Lost items
 # ---------------------------------------------------------------------------
 
-def _serialize_item(row, current_sub):
-    # Absolute so it still resolves once the frontend is on a different origin
-    # than the API (there's no dev proxy to lean on once deployed separately).
-    image_url = f"{request.host_url.rstrip('/')}/api/uploads/{row['image_filename']}" if row["image_filename"] else None
-    return {
+def _now():
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _serialize_item(row, user):
+    current_sub = user["sub"] if user else None
+    item = {
         "id": row["id"],
         "name": row["name"],
         "category": row["category"],
@@ -152,9 +269,40 @@ def _serialize_item(row, current_sub):
         "storage": row["storage"],
         "foundAt": row["found_at"],
         "description": row["description"],
-        "imageUrl": image_url,
+        # Relative: the frontend resolves it against its API base (same origin via proxy).
+        "imageUrl": f"/api/uploads/{row['image_filename']}" if row["image_filename"] else None,
         "reportedByMe": bool(current_sub) and row["reporter_sub"] == current_sub,
+        "claimedByMe": bool(current_sub) and row["claimant_sub"] == current_sub,
     }
+    # Personal details of reporters/claimants are for the lost & found staff only.
+    if _is_admin(user):
+        item["admin"] = {
+            "reporterName": row["reporter_name"],
+            "reporterEmail": row["reporter_email"],
+            "claimantName": row["claimant_name"],
+            "claimantEmail": row["claimant_email"],
+            "claimedAt": row["claimed_at"],
+            "resolvedBy": row["resolved_by"],
+            "resolvedAt": row["resolved_at"],
+        }
+    return item
+
+
+def _fetch_item(conn, item_id):
+    return conn.execute("SELECT * FROM items WHERE id = ?", (item_id,)).fetchone()
+
+
+# Magic bytes → extension. The client-supplied filename/extension is never trusted.
+def _detect_image_ext(head):
+    if head.startswith(b"\x89PNG\r\n\x1a\n"):
+        return ".png"
+    if head.startswith(b"\xff\xd8\xff"):
+        return ".jpg"
+    if head[:6] in (b"GIF87a", b"GIF89a"):
+        return ".gif"
+    if head[:4] == b"RIFF" and head[8:12] == b"WEBP":
+        return ".webp"
+    return None
 
 
 @app.errorhandler(413)
@@ -165,7 +313,6 @@ def _file_too_large(_err):
 @app.get("/api/items")
 def list_items():
     user = _current_user()
-    current_sub = user["sub"] if user else None
     mine_only = request.args.get("mine") == "1"
 
     if mine_only and not user:
@@ -174,31 +321,28 @@ def list_items():
     with get_connection() as conn:
         if mine_only:
             rows = conn.execute(
-                "SELECT * FROM items WHERE reporter_sub = ? ORDER BY created_at DESC",
-                (current_sub,),
+                "SELECT * FROM items WHERE reporter_sub = ? OR claimant_sub = ? ORDER BY created_at DESC",
+                (user["sub"], user["sub"]),
             ).fetchall()
         else:
             rows = conn.execute("SELECT * FROM items ORDER BY created_at DESC").fetchall()
 
-    return jsonify(items=[_serialize_item(row, current_sub) for row in rows])
+    return jsonify(items=[_serialize_item(row, user) for row in rows])
 
 
 @app.get("/api/items/<item_id>")
 def get_item(item_id):
     user = _current_user()
     with get_connection() as conn:
-        row = conn.execute("SELECT * FROM items WHERE id = ?", (item_id,)).fetchone()
+        row = _fetch_item(conn, item_id)
     if not row:
         return jsonify(error="not_found"), 404
-    return jsonify(item=_serialize_item(row, user["sub"] if user else None))
+    return jsonify(item=_serialize_item(row, user))
 
 
 @app.post("/api/items")
-def create_item():
-    user = _current_user()
-    if not user:
-        return jsonify(error="unauthorized"), 401
-
+@login_required
+def create_item(user):
     name = (request.form.get("name") or "").strip()
     category = (request.form.get("category") or "").strip()
     location = (request.form.get("location") or "").strip()
@@ -206,20 +350,31 @@ def create_item():
 
     if not name or not location:
         return jsonify(error="missing_fields"), 400
+    if (
+        len(name) > MAX_NAME_LENGTH
+        or len(location) > MAX_LOCATION_LENGTH
+        or (description and len(description) > MAX_DESCRIPTION_LENGTH)
+    ):
+        return jsonify(error="field_too_long"), 400
     if category not in ALLOWED_CATEGORIES:
         return jsonify(error="invalid_category"), 400
+    if not _is_admin(user) and _rate_limited(("create", user["sub"]), limit=10, window_seconds=3600):
+        return jsonify(error="rate_limited"), 429
 
-    image_filename = None
     photo = request.files.get("photo")
+    ext = None
     if photo and photo.filename:
-        ext = Path(secure_filename(photo.filename)).suffix.lower()
-        if ext not in ALLOWED_IMAGE_EXTENSIONS:
+        ext = _detect_image_ext(photo.stream.read(12))
+        photo.stream.seek(0)
+        if not ext:
             return jsonify(error="invalid_file_type"), 400
-        image_filename = f"{uuid.uuid4().hex}{ext}"
-        photo.save(UPLOAD_DIR / image_filename)
 
     item_id = f"itm-{uuid.uuid4().hex[:12]}"
-    now = datetime.now(timezone.utc).isoformat()
+    image_filename = f"{uuid.uuid4().hex}{ext}" if ext else None
+    now = _now()
+
+    if image_filename:
+        photo.save(UPLOAD_DIR / image_filename)
 
     with get_connection() as conn:
         conn.execute(
@@ -244,31 +399,110 @@ def create_item():
                 now,
             ),
         )
-        row = conn.execute("SELECT * FROM items WHERE id = ?", (item_id,)).fetchone()
+        row = _fetch_item(conn, item_id)
 
-    return jsonify(item=_serialize_item(row, user["sub"])), 201
+    return jsonify(item=_serialize_item(row, user)), 201
 
 
 @app.post("/api/items/<item_id>/claim")
-def claim_item(item_id):
-    user = _current_user()
-    if not user:
-        return jsonify(error="unauthorized"), 401
+@login_required
+def claim_item(user, item_id):
+    """Any signed-in user can *request* pickup; only an admin can mark it returned."""
+    if _rate_limited(("claim", user["sub"]), limit=10, window_seconds=3600):
+        return jsonify(error="rate_limited"), 429
 
     with get_connection() as conn:
-        row = conn.execute("SELECT * FROM items WHERE id = ?", (item_id,)).fetchone()
+        row = _fetch_item(conn, item_id)
         if not row:
             return jsonify(error="not_found"), 404
-        conn.execute("UPDATE items SET status = 'returned' WHERE id = ?", (item_id,))
-        row = conn.execute("SELECT * FROM items WHERE id = ?", (item_id,)).fetchone()
+        if row["reporter_sub"] == user["sub"]:
+            return jsonify(error="own_item"), 400
+        # Conditional UPDATE so two people can't both claim the same item at once.
+        updated = conn.execute(
+            """
+            UPDATE items
+               SET status = 'requested', claimant_sub = ?, claimant_name = ?, claimant_email = ?, claimed_at = ?
+             WHERE id = ? AND status = 'stored'
+            """,
+            (user["sub"], user["name"], user["email"], _now(), item_id),
+        ).rowcount
+        if not updated:
+            return jsonify(error="already_returned" if row["status"] == "returned" else "already_requested"), 409
+        row = _fetch_item(conn, item_id)
 
-    return jsonify(item=_serialize_item(row, user["sub"]))
+    return jsonify(item=_serialize_item(row, user))
+
+
+@app.post("/api/items/<item_id>/claim/cancel")
+@login_required
+def cancel_claim(user, item_id):
+    with get_connection() as conn:
+        updated = conn.execute(
+            """
+            UPDATE items
+               SET status = 'stored', claimant_sub = NULL, claimant_name = NULL, claimant_email = NULL, claimed_at = NULL
+             WHERE id = ? AND status = 'requested' AND claimant_sub = ?
+            """,
+            (item_id, user["sub"]),
+        ).rowcount
+        if not updated:
+            return jsonify(error="not_claimant"), 409
+        row = _fetch_item(conn, item_id)
+
+    return jsonify(item=_serialize_item(row, user))
+
+
+@app.post("/api/items/<item_id>/status")
+@admin_required
+def set_item_status(user, item_id):
+    """Admin only. 'returned' confirms a handover; 'stored' rejects a request or undoes a return."""
+    status = (request.get_json(silent=True) or {}).get("status")
+    if status not in ("stored", "returned"):
+        return jsonify(error="invalid_status"), 400
+
+    with get_connection() as conn:
+        if not _fetch_item(conn, item_id):
+            return jsonify(error="not_found"), 404
+        if status == "returned":
+            conn.execute(
+                "UPDATE items SET status = 'returned', resolved_by = ?, resolved_at = ? WHERE id = ?",
+                (user["email"], _now(), item_id),
+            )
+        else:
+            conn.execute(
+                """
+                UPDATE items
+                   SET status = 'stored', claimant_sub = NULL, claimant_name = NULL, claimant_email = NULL,
+                       claimed_at = NULL, resolved_by = NULL, resolved_at = NULL
+                 WHERE id = ?
+                """,
+                (item_id,),
+            )
+        row = _fetch_item(conn, item_id)
+
+    app.logger.info("Admin %s set item %s to %s", user["email"], item_id, status)
+    return jsonify(item=_serialize_item(row, user))
+
+
+@app.delete("/api/items/<item_id>")
+@admin_required
+def delete_item(user, item_id):
+    with get_connection() as conn:
+        row = _fetch_item(conn, item_id)
+        if not row:
+            return jsonify(error="not_found"), 404
+        conn.execute("DELETE FROM items WHERE id = ?", (item_id,))
+
+    if row["image_filename"]:
+        (UPLOAD_DIR / row["image_filename"]).unlink(missing_ok=True)
+    app.logger.info("Admin %s deleted item %s", user["email"], item_id)
+    return jsonify(ok=True)
 
 
 @app.get("/api/uploads/<path:filename>")
 def uploaded_file(filename):
-    return send_from_directory(UPLOAD_DIR, filename)
+    return send_from_directory(UPLOAD_DIR, filename, max_age=60 * 60 * 24 * 30)
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=PORT, debug=not IS_PRODUCTION)
+    app.run(host=HOST, port=PORT, debug=DEBUG)

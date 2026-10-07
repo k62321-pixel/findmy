@@ -4,6 +4,7 @@ import { AppShell } from '../components/AppShell'
 import { EmptyState } from '../components/EmptyState'
 import { Icon } from '../components/Icon'
 import { ItemCard } from '../components/ItemCard'
+import { LoadError } from '../components/LoadError'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 import { SearchField } from '../components/SearchField'
 import { useItems } from '../store/ItemsProvider'
@@ -70,6 +71,8 @@ export function HomePage() {
 
         {status === 'loading' ? (
           <LoadingSpinner />
+        ) : status === 'error' ? (
+          <LoadError />
         ) : recent.length > 0 ? (
           <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
             {recent.map((item) => (

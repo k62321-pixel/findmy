@@ -2,6 +2,16 @@
   command = "npm run build"
   publish = "dist"
 
+# Proxies the API through this site's own domain so the session cookie is
+# first-party: works in Safari/iOS (which blocks third-party cookies), keeps
+# SameSite=Lax as CSRF protection, and needs no VITE_API_BASE_URL.
+# Must come before the SPA fallback below. Replace the host with your Render URL.
+[[redirects]]
+  from = "/api/*"
+  to = "https://found-it-api.onrender.com/api/:splat"
+  status = 200
+  force = true
+
 # React Router serves routes like /browse and /items/:id client-side only —
 # without this, a hard refresh or direct link on those paths 404s because
 # Netlify looks for a matching file/folder first.

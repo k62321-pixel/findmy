@@ -6,7 +6,7 @@ import { Icon } from '../components/Icon'
 import { useAuth } from '../store/AuthProvider'
 
 interface LocationState {
-  from?: { pathname: string }
+  from?: { pathname: string; search?: string }
 }
 
 export function LoginPage() {
@@ -15,7 +15,9 @@ export function LoginPage() {
   const location = useLocation()
   const [error, setError] = useState('')
 
-  const redirectTo = (location.state as LocationState | null)?.from?.pathname ?? '/'
+  const from = (location.state as LocationState | null)?.from
+  // Only same-app paths: never bounce to /login again or to anything off-site.
+  const redirectTo = from?.pathname?.startsWith('/') && from.pathname !== '/login' ? `${from.pathname}${from.search ?? ''}` : '/'
 
   async function handleSuccess(credentialResponse: CredentialResponse) {
     if (!credentialResponse.credential) {
@@ -25,8 +27,8 @@ export function LoginPage() {
     try {
       await loginWithGoogle(credentialResponse.credential)
       navigate(redirectTo, { replace: true })
-    } catch {
-      setError('로그인에 실패했습니다. 다시 시도해 주세요.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '로그인에 실패했습니다. 다시 시도해 주세요.')
     }
   }
 
