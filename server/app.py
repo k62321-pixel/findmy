@@ -12,10 +12,8 @@ Item lifecycle: stored (보관중) → requested (수령 신청됨, by any signe
 → returned (반환완료, only an admin listed in ADMIN_EMAILS can confirm this).
 """
 import os
-import threading
 import time
 import uuid
-from collections import defaultdict, deque
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 
@@ -45,7 +43,8 @@ ADMIN_EMAILS = {e.lower() for e in _csv_env("ADMIN_EMAILS")}
 ALLOWED_EMAIL_DOMAINS = {d.lower().lstrip("@") for d in _csv_env("ALLOWED_EMAIL_DOMAINS")}
 HOST = os.environ.get("HOST", "127.0.0.1")
 PORT = int(os.environ.get("PORT", 4000))
-IS_PRODUCTION = os.environ.get("FLASK_ENV") == "production"
+# Vercel sets VERCEL=1 on its build and runtime, so no extra flag is needed there.
+IS_PRODUCTION = os.environ.get("FLASK_ENV") == "production" or os.environ.get("VERCEL") == "1"
 # Never on by default: the Werkzeug debugger allows running arbitrary code.
 DEBUG = os.environ.get("FLASK_DEBUG") == "1" and not IS_PRODUCTION
 
@@ -74,7 +73,17 @@ MAX_NAME_LENGTH = 100
 MAX_LOCATION_LENGTH = 200
 MAX_DESCRIPTION_LENGTH = 1000
 
+if os.environ.get("VERCEL") == "1" and not IS_POSTGRES:
+    raise RuntimeError("DATABASE_URL must be set on Vercel — serverless functions have no persistent disk.")
+
 app = Flask(__name__)
+if os.environ.get("VERCEL") == "1":
+    # Vercel's edge sets X-Forwarded-Proto/Host; trusting them makes request.host_url the
+    # real https://<site>.vercel.app, so same-site writes pass the Origin check below
+    # without FRONTEND_ORIGIN having to list the deployment URL.
+    from werkzeug.middleware.proxy_fix import ProxyFix
+
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 app.config["MAX_CONTENT_LENGTH"] = MAX_PHOTO_BYTES + 64 * 1024  # photo + the text fields
 CORS(app, supports_credentials=True, origins=FRONTEND_ORIGINS)
 
@@ -111,21 +120,10 @@ def _security_headers(response):
     return response
 
 
-_rate_lock = threading.Lock()
-_rate_hits = defaultdict(deque)
-
-
-def _rate_limited(key, limit, window_seconds):
-    """In-memory sliding window. Fine for a single gunicorn worker; resets on restart."""
-    now = time.monotonic()
-    with _rate_lock:
-        hits = _rate_hits[key]
-        while hits and now - hits[0] > window_seconds:
-            hits.popleft()
-        if len(hits) >= limit:
-            return True
-        hits.append(now)
-        return False
+# Abuse limits are counted from the database rather than process memory, because
+# serverless hosts (Vercel) run many short-lived instances that share no memory.
+MAX_REPORTS_PER_HOUR = 10
+MAX_PENDING_CLAIMS = 3
 
 
 # ---------------------------------------------------------------------------
@@ -361,8 +359,15 @@ def create_item(user):
         return jsonify(error="field_too_long"), 400
     if category not in ALLOWED_CATEGORIES:
         return jsonify(error="invalid_category"), 400
-    if not _is_admin(user) and _rate_limited(("create", user["sub"]), limit=10, window_seconds=3600):
-        return jsonify(error="rate_limited"), 429
+    if not _is_admin(user):
+        an_hour_ago = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+        with get_connection() as conn:
+            recent = conn.execute(
+                "SELECT COUNT(*) AS n FROM items WHERE reporter_sub = ? AND created_at > ?",
+                (user["sub"], an_hour_ago),
+            ).fetchone()["n"]
+        if recent >= MAX_REPORTS_PER_HOUR:
+            return jsonify(error="rate_limited"), 429
 
     photo = request.files.get("photo")
     photo_data = image_filename = content_type = None
@@ -416,15 +421,19 @@ def create_item(user):
 @login_required
 def claim_item(user, item_id):
     """Any signed-in user can *request* pickup; only an admin can mark it returned."""
-    if _rate_limited(("claim", user["sub"]), limit=10, window_seconds=3600):
-        return jsonify(error="rate_limited"), 429
-
     with get_connection() as conn:
         row = _fetch_item(conn, item_id)
         if not row:
             return jsonify(error="not_found"), 404
         if row["reporter_sub"] == user["sub"]:
             return jsonify(error="own_item"), 400
+        # Stops one account from parking requests on many items at once.
+        pending = conn.execute(
+            "SELECT COUNT(*) AS n FROM items WHERE claimant_sub = ? AND status = 'requested'",
+            (user["sub"],),
+        ).fetchone()["n"]
+        if pending >= MAX_PENDING_CLAIMS:
+            return jsonify(error="too_many_claims"), 429
         # Conditional UPDATE so two people can't both claim the same item at once.
         updated = conn.execute(
             """

@@ -56,15 +56,15 @@ src/
   pages/        Home, Browse, ItemDetail, Report, MyItems, Admin, Login
   store/        AuthProvider — 로그인 상태(/api/me, /api/auth/google, /api/logout)
                 ItemsProvider — 습득물 목록 상태 + 신고/수령 신청/관리자 액션
-  lib/          categories, format(날짜 표기), filter(검색·정렬), api(백엔드 URL·오류 메시지)
-netlify.toml    Netlify 빌드 설정 + /api 프록시 + SPA 라우팅 리다이렉트
-render.yaml     Render Blueprint (백엔드 배포 설정)
+  lib/          categories, format(날짜 표기), filter(검색·정렬), api(백엔드 URL·오류 메시지), image(업로드 전 사진 압축)
+vercel.json     Vercel 빌드 설정 + /api → Flask 함수 + SPA 라우팅
+api/index.py    Vercel 서버리스 진입점 (server/app.py의 Flask 앱을 그대로 노출)
+requirements.txt  Python 의존성 (Vercel이 루트에서 읽음)
 server/
   app.py            Flask 서버 — 인증(Google ID 토큰 검증 → 세션 쿠키) + 습득물 API
   db.py             PostgreSQL(DATABASE_URL) / SQLite 스키마 · 마이그레이션 · 커넥션 헬퍼
   items.db          로컬 개발용 SQLite (습득물 + 사진, .gitignore 처리됨, 최초 실행 시 자동 생성)
-  Procfile          배포 시작 명령 (gunicorn app:app)
-  requirements.txt
+  requirements.txt  루트 requirements.txt를 그대로 포함
   .env / .env.example
 ```
 
@@ -125,43 +125,38 @@ ID 토큰(JWT)을 받아온다 → `AuthProvider.loginWithGoogle`이 그 토큰�
 사진은 파일명·확장자를 믿지 않고 파일 앞부분 바이트로 PNG/JPEG/GIF/WEBP인지 확인한 뒤
 `uuid` 파일명으로 DB의 `images` 테이블에 저장합니다. 사진은 3MB로 제한됩니다(`413 file_too_large`).
 
-**보안 장치**: 쓰기 요청은 `Origin` 헤더가 `FRONTEND_ORIGIN`이 아니면 거부(CSRF 방지),
+**보안 장치**: 쓰기 요청은 `Origin` 헤더가 같은 사이트나 `FRONTEND_ORIGIN`이 아니면 거부(CSRF 방지),
 모든 응답에 `X-Content-Type-Options: nosniff`, 로그아웃 시 쿠키를 같은 속성으로 삭제.
 
-## 배포 (Neon + Render + Netlify, 전부 무료)
+## 배포 (Vercel + Neon, 전부 무료·카드 불필요)
 
-Netlify가 `/api/*`를 Render로 **프록시**하므로 브라우저 입장에서는 한 도메인입니다.
-덕분에 사파리/iOS의 서드파티 쿠키 차단에 걸리지 않고, 쿠키는 `SameSite=Lax` 그대로 씁니다.
+Vercel 한 곳에 프론트(정적 파일)와 Flask API(Python 서버리스 함수, `api/index.py`)가 함께 올라갑니다.
+같은 도메인이라 사파리/iOS의 서드파티 쿠키 차단에 걸리지 않고, 쿠키는 `SameSite=Lax` 그대로 씁니다.
 
-Render 무료 플랜은 재시작할 때마다 디스크가 초기화되므로, 습득물과 사진은 전부
-Neon(무료 PostgreSQL, 0.5GB)에 저장합니다. 사진은 업로드 전에 브라우저에서 1600px JPEG로
-줄여서(보통 300KB 안팎, EXIF/GPS 정보 제거) 올라갑니다. `DATABASE_URL`이 없으면 로컬 SQLite를 씁니다.
+서버리스 함수는 디스크에 저장할 수 없으므로 습득물과 사진은 전부 Neon(무료 PostgreSQL, 0.5GB)에
+저장합니다. 사진은 업로드 전에 브라우저에서 1600px JPEG로 줄여서(보통 300KB 안팎, EXIF/GPS 정보 제거)
+올라갑니다. 신고·수령 신청 횟수 제한도 메모리가 아니라 DB 기록으로 판단합니다.
 
-**0. DB — Neon**
+**1. DB — Neon**
 
-1. https://neon.tech 가입 → 프로젝트 생성 (리전은 Render와 가까운 곳, 예: AWS US West)
-2. Connection string(`postgresql://...?sslmode=require`)을 복사 — 이 값은 **비밀번호가 들어 있으니 커밋 금지**
+1. https://neon.tech 가입 → 프로젝트 생성 (리전: AWS US West (Oregon) — `vercel.json`의 함수 리전 `pdx1`과 가까운 곳. 리전을 바꾸면 둘 다 맞추세요)
+2. Connect → Connection string(`postgresql://...?sslmode=require`) 복사 — **비밀번호가 들어 있으니 커밋 금지**
 
-**1. 백엔드 — Render (Blueprint)**
+**2. Vercel**
 
-1. Render → New → Blueprint → 이 저장소 선택 (`render.yaml` 자동 인식)
-2. 물어보는 환경 변수 입력: `DATABASE_URL`(Neon), `GOOGLE_CLIENT_ID`, `FRONTEND_ORIGIN`(Netlify 주소),
-   `ADMIN_EMAILS`, `ALLOWED_EMAIL_DOMAINS`. `SESSION_SECRET`은 자동 생성됩니다.
-3. 배포 후 나온 주소(예: `https://found-it-api.onrender.com`)를 `netlify.toml`의
-   `/api/*` 프록시 대상에 넣고 push.
-
-> 무료 플랜은 15분간 요청이 없으면 잠들고, 깨어나는 데 30초~1분 걸려 첫 요청이 실패할 수 있습니다
-> (화면에 "다시 시도" 버튼이 나옵니다). 데이터는 Neon에 있으므로 사라지지 않습니다.
-
-**2. 프론트엔드 — Netlify**
-
-1. Netlify → Add new site → Import an existing project → GitHub → 이 저장소
-2. 빌드 설정은 `netlify.toml`이 자동으로 잡습니다 (`npm run build` / `dist`)
-3. Environment variables: `VITE_GOOGLE_CLIENT_ID`만 넣으면 됩니다 (`VITE_API_BASE_URL`은 비워두기)
+1. https://vercel.com → GitHub로 가입 → Add New → Project → 이 저장소 Import
+2. Framework Preset은 Vite로 자동 인식, 빌드 설정은 `vercel.json`이 잡습니다
+3. Environment Variables (`.env` 내용을 통째로 붙여넣어도 됨):
+   - `VITE_GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_ID` — 같은 클라이언트 ID
+   - `SESSION_SECRET` — 32자 이상 무작위 문자열
+   - `DATABASE_URL` — Neon 연결 문자열
+   - `ADMIN_EMAILS`, `ALLOWED_EMAIL_DOMAINS`
+   - `FRONTEND_ORIGIN`은 필요 없음 — Vercel에서는 같은 도메인 요청을 자동으로 허용합니다
+4. Deploy
 
 **3. Google Cloud Console**
 
-승인된 자바스크립트 원본에 Netlify 주소를 추가하세요.
+승인된 자바스크립트 원본에 Vercel 주소를 추가하세요.
 
 ## 디자인 토큰
 

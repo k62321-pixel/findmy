@@ -1,8 +1,2 @@
-Flask==3.0.3
-flask-cors==4.0.1
-google-auth==2.34.0
-gunicorn==23.0.0
-psycopg[binary]==3.2.13
-PyJWT==2.9.0
-python-dotenv==1.0.1
-requests==2.32.3
+# The dependency list lives at the repo root, where Vercel's Python runtime reads it.
+-r ../requirements.txt
