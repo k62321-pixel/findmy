@@ -1,6 +1,15 @@
-"""SQLite persistence for lost-and-found items.
+"""Persistence for lost-and-found items and their photos.
 
-One file, one table — this app has no relations that would justify an ORM.
+Two backends behind one tiny interface:
+- DATABASE_URL set (postgres://…) → PostgreSQL, e.g. Neon's free tier. Used in
+  production because free hosts like Render wipe their local disk on every restart.
+- otherwise → a local SQLite file, for development.
+
+Photos are stored in the database too (they are compressed client-side first),
+so there is no upload folder that could disappear.
+
+Queries are written with SQLite-style "?" placeholders; they are rewritten for
+psycopg ("%s") when running on Postgres.
 """
 import os
 import sqlite3
@@ -8,36 +17,66 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
 
-# DATA_DIR lets a host mount a persistent disk (e.g. Render Disk at /var/data)
-# so the DB and uploaded photos survive redeploys. Defaults to this folder.
-DATA_DIR = Path(os.environ.get("DATA_DIR") or Path(__file__).parent)
-DATA_DIR.mkdir(parents=True, exist_ok=True)
-DB_PATH = DATA_DIR / "items.db"
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
+IS_POSTGRES = DATABASE_URL.startswith(("postgres://", "postgresql://"))
 
-# Columns added after the first release — ALTERed into existing databases on startup.
-_MIGRATED_COLUMNS = {
-    "claimant_sub": "TEXT",
-    "claimant_name": "TEXT",
-    "claimant_email": "TEXT",
-    "claimed_at": "TEXT",
-    "resolved_by": "TEXT",
-    "resolved_at": "TEXT",
-}
+if IS_POSTGRES:
+    import psycopg
+    from psycopg.rows import dict_row
+else:
+    DATA_DIR = Path(os.environ.get("DATA_DIR") or Path(__file__).parent)
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    DB_PATH = DATA_DIR / "items.db"
+
+# Columns added after the first release — added to existing databases on startup.
+_MIGRATED_COLUMNS = (
+    "claimant_sub",
+    "claimant_name",
+    "claimant_email",
+    "claimed_at",
+    "resolved_by",
+    "resolved_at",
+)
+
+
+class Connection:
+    """Just enough of a DB-API connection for app.py: execute() returning a cursor."""
+
+    def __init__(self, raw):
+        self._raw = raw
+
+    def execute(self, sql, params=()):
+        if IS_POSTGRES:
+            sql = sql.replace("?", "%s")
+        cursor = self._raw.cursor()
+        cursor.execute(sql, params)
+        return cursor
+
+
+def _connect():
+    if IS_POSTGRES:
+        return psycopg.connect(DATABASE_URL, row_factory=dict_row, connect_timeout=10)
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
 
 
 @contextmanager
-def get_connection() -> Iterator[sqlite3.Connection]:
+def get_connection() -> Iterator[Connection]:
     """Commits on success, rolls back on error, and always closes the connection."""
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    raw = _connect()
     try:
-        with conn:
-            yield conn
+        yield Connection(raw)
+        raw.commit()
+    except BaseException:
+        raw.rollback()
+        raise
     finally:
-        conn.close()
+        raw.close()
 
 
 def init_db() -> None:
+    blob = "BYTEA" if IS_POSTGRES else "BLOB"
     with get_connection() as conn:
         conn.execute(
             """
@@ -58,9 +97,22 @@ def init_db() -> None:
             )
             """
         )
-        existing = {row["name"] for row in conn.execute("PRAGMA table_info(items)")}
-        for column, column_type in _MIGRATED_COLUMNS.items():
-            if column not in existing:
-                conn.execute(f"ALTER TABLE items ADD COLUMN {column} {column_type}")
+        if IS_POSTGRES:
+            for column in _MIGRATED_COLUMNS:
+                conn.execute(f"ALTER TABLE items ADD COLUMN IF NOT EXISTS {column} TEXT")
+        else:
+            existing = {row["name"] for row in conn.execute("PRAGMA table_info(items)").fetchall()}
+            for column in _MIGRATED_COLUMNS:
+                if column not in existing:
+                    conn.execute(f"ALTER TABLE items ADD COLUMN {column} TEXT")
+        conn.execute(
+            f"""
+            CREATE TABLE IF NOT EXISTS images (
+                filename TEXT PRIMARY KEY,
+                content_type TEXT NOT NULL,
+                data {blob} NOT NULL
+            )
+            """
+        )
         conn.execute("CREATE INDEX IF NOT EXISTS idx_items_reporter ON items(reporter_sub)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_items_claimant ON items(claimant_sub)")

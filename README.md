@@ -61,9 +61,8 @@ netlify.toml    Netlify 빌드 설정 + /api 프록시 + SPA 라우팅 리다이
 render.yaml     Render Blueprint (백엔드 배포 설정)
 server/
   app.py            Flask 서버 — 인증(Google ID 토큰 검증 → 세션 쿠키) + 습득물 API
-  db.py             SQLite 스키마 · 마이그레이션 · 커넥션 헬퍼
-  items.db          습득물 데이터 (SQLite, .gitignore 처리됨, 최초 실행 시 자동 생성)
-  uploads/          신고 사진 원본 파일 (.gitignore 처리됨)
+  db.py             PostgreSQL(DATABASE_URL) / SQLite 스키마 · 마이그레이션 · 커넥션 헬퍼
+  items.db          로컬 개발용 SQLite (습득물 + 사진, .gitignore 처리됨, 최초 실행 시 자동 생성)
   Procfile          배포 시작 명령 (gunicorn app:app)
   requirements.txt
   .env / .env.example
@@ -95,7 +94,7 @@ ID 토큰(JWT)을 받아온다 → `AuthProvider.loginWithGoogle`이 그 토큰�
   - `FRONTEND_ORIGIN` (프론트 주소, 쉼표로 여러 개)
   - `ADMIN_EMAILS` — 반환완료 처리 권한이 있는 관리자 이메일(쉼표로 여러 개)
   - `ALLOWED_EMAIL_DOMAINS` — 로그인 허용 도메인, 예: `school.ac.kr` (비우면 모든 구글 계정 허용, 관리자 이메일은 항상 허용)
-  - `DATA_DIR` — DB와 사진 저장 위치 (배포 시 영구 디스크 경로)
+  - `DATABASE_URL` — PostgreSQL 연결 문자열 (배포 시 필수, 로컬은 비우면 SQLite)
 
 ## 권한과 수령 흐름
 
@@ -124,28 +123,35 @@ ID 토큰(JWT)을 받아온다 → `AuthProvider.loginWithGoogle`이 그 토큰�
 - `GET /api/uploads/<filename>` — 업로드된 사진 (공개)
 
 사진은 파일명·확장자를 믿지 않고 파일 앞부분 바이트로 PNG/JPEG/GIF/WEBP인지 확인한 뒤
-`uuid` 파일명으로 저장합니다. 요청 크기는 8MB로 제한됩니다(`413 file_too_large`).
+`uuid` 파일명으로 DB의 `images` 테이블에 저장합니다. 사진은 3MB로 제한됩니다(`413 file_too_large`).
 
 **보안 장치**: 쓰기 요청은 `Origin` 헤더가 `FRONTEND_ORIGIN`이 아니면 거부(CSRF 방지),
 모든 응답에 `X-Content-Type-Options: nosniff`, 로그아웃 시 쿠키를 같은 속성으로 삭제.
 
-## 배포 (Render + Netlify)
+## 배포 (Neon + Render + Netlify, 전부 무료)
 
 Netlify가 `/api/*`를 Render로 **프록시**하므로 브라우저 입장에서는 한 도메인입니다.
 덕분에 사파리/iOS의 서드파티 쿠키 차단에 걸리지 않고, 쿠키는 `SameSite=Lax` 그대로 씁니다.
 
+Render 무료 플랜은 재시작할 때마다 디스크가 초기화되므로, 습득물과 사진은 전부
+Neon(무료 PostgreSQL, 0.5GB)에 저장합니다. 사진은 업로드 전에 브라우저에서 1600px JPEG로
+줄여서(보통 300KB 안팎, EXIF/GPS 정보 제거) 올라갑니다. `DATABASE_URL`이 없으면 로컬 SQLite를 씁니다.
+
+**0. DB — Neon**
+
+1. https://neon.tech 가입 → 프로젝트 생성 (리전은 Render와 가까운 곳, 예: AWS US West)
+2. Connection string(`postgresql://...?sslmode=require`)을 복사 — 이 값은 **비밀번호가 들어 있으니 커밋 금지**
+
 **1. 백엔드 — Render (Blueprint)**
 
 1. Render → New → Blueprint → 이 저장소 선택 (`render.yaml` 자동 인식)
-2. 물어보는 환경 변수 입력: `GOOGLE_CLIENT_ID`, `FRONTEND_ORIGIN`(Netlify 주소),
+2. 물어보는 환경 변수 입력: `DATABASE_URL`(Neon), `GOOGLE_CLIENT_ID`, `FRONTEND_ORIGIN`(Netlify 주소),
    `ADMIN_EMAILS`, `ALLOWED_EMAIL_DOMAINS`. `SESSION_SECRET`은 자동 생성됩니다.
 3. 배포 후 나온 주소(예: `https://found-it-api.onrender.com`)를 `netlify.toml`의
    `/api/*` 프록시 대상에 넣고 push.
 
-> **무료 플랜은 디스크가 영구적이지 않습니다** — 재배포·재시작 시 DB와 사진이 초기화됩니다.
-> 실제 운영이라면 `render.yaml`에서 `plan: starter`로 바꾸고 `disk`와 `DATA_DIR` 주석을 해제하세요(유료).
 > 무료 플랜은 15분간 요청이 없으면 잠들고, 깨어나는 데 30초~1분 걸려 첫 요청이 실패할 수 있습니다
-> (화면에 "다시 시도" 버튼이 나옵니다).
+> (화면에 "다시 시도" 버튼이 나옵니다). 데이터는 Neon에 있으므로 사라지지 않습니다.
 
 **2. 프론트엔드 — Netlify**
 

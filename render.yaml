@@ -5,8 +5,8 @@ services:
     name: found-it-api
     runtime: python
     rootDir: server
-    # The free plan has no persistent disk: items.db and photos are wiped on every
-    # redeploy/restart. For real use switch to "starter" and uncomment the disk below.
+    # Free plan: the local disk is wiped on every restart, so all data (items and
+    # photos) lives in the Postgres database at DATABASE_URL (e.g. Neon's free tier).
     plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4
@@ -18,6 +18,8 @@ services:
         value: production
       - key: SESSION_SECRET
         generateValue: true
+      - key: DATABASE_URL
+        sync: false
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: FRONTEND_ORIGIN
@@ -26,9 +28,3 @@ services:
         sync: false
       - key: ALLOWED_EMAIL_DOMAINS
         sync: false
-    #   - key: DATA_DIR
-    #     value: /var/data
-    # disk:
-    #   name: found-it-data
-    #   mountPath: /var/data
-    #   sizeGB: 1

@@ -3,13 +3,14 @@ import { useNavigate } from 'react-router-dom'
 import { AppShell } from '../components/AppShell'
 import { Icon } from '../components/Icon'
 import { CATEGORIES } from '../lib/categories'
+import { compressImage } from '../lib/image'
 import { useItems } from '../store/ItemsProvider'
 import type { CategoryId } from '../types'
 
 // Listing concrete types (not image/*) makes iOS convert HEIC photos to JPEG on upload.
 const ACCEPTED_IMAGE_TYPES = 'image/jpeg,image/png,image/gif,image/webp'
-// Slightly under the server's 8MB request cap, leaving room for the other form fields.
-const MAX_PHOTO_BYTES = 7.5 * 1024 * 1024
+// Server's per-photo cap (after compressImage, photos are usually far below it).
+const MAX_PHOTO_BYTES = 3 * 1024 * 1024
 
 interface FormErrors {
   name?: string
@@ -29,6 +30,7 @@ export function ReportPage() {
   const [photo, setPhoto] = useState<{ file: File; previewUrl: string } | null>(null)
   const [errors, setErrors] = useState<FormErrors>({})
   const [submitting, setSubmitting] = useState(false)
+  const [processingPhoto, setProcessingPhoto] = useState(false)
   const [submitError, setSubmitError] = useState('')
 
   function validate(): FormErrors {
@@ -62,18 +64,24 @@ export function ReportPage() {
     }
   }
 
-  function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
+  async function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const input = e.target
+    const original = input.files?.[0]
+    if (!original) return
     // Some Android cameras report an empty type — let the server's byte check decide then.
-    if (file.type && !ACCEPTED_IMAGE_TYPES.split(',').includes(file.type)) {
+    if (original.type && !ACCEPTED_IMAGE_TYPES.split(',').includes(original.type)) {
       setSubmitError('JPG, PNG, GIF, WEBP 이미지만 첨부할 수 있습니다.')
-      e.target.value = ''
+      input.value = ''
       return
     }
+
+    setProcessingPhoto(true)
+    const file = await compressImage(original)
+    setProcessingPhoto(false)
+
     if (file.size > MAX_PHOTO_BYTES) {
-      setSubmitError('사진 용량이 너무 큽니다. 8MB 이하로 올려 주세요.')
-      e.target.value = ''
+      setSubmitError('사진 용량이 너무 큽니다. 3MB 이하로 올려 주세요.')
+      input.value = ''
       return
     }
     setSubmitError('')
@@ -180,8 +188,14 @@ export function ReportPage() {
                   onClick={() => fileRef.current?.click()}
                   className="flex h-32 w-full flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-outline-variant bg-surface-container text-on-surface-variant transition-colors hover:bg-surface-container-high active:bg-surface-variant"
                 >
-                  <Icon name="add_a_photo" size={32} />
-                  <span className="font-label-md text-label-md">탭하여 사진 찍기 또는 업로드</span>
+                  <Icon
+                    name={processingPhoto ? 'progress_activity' : 'add_a_photo'}
+                    size={32}
+                    className={processingPhoto ? 'animate-spin' : ''}
+                  />
+                  <span className="font-label-md text-label-md">
+                    {processingPhoto ? '사진 처리 중...' : '탭하여 사진 찍기 또는 업로드'}
+                  </span>
                 </button>
               )}
             </Field>
@@ -207,7 +221,7 @@ export function ReportPage() {
 
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || processingPhoto}
               className="mt-4 flex h-14 w-full items-center justify-center gap-2 rounded-lg bg-primary font-label-md text-label-md text-on-primary shadow-level1 transition-transform hover:bg-primary/90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Icon name={submitting ? 'progress_activity' : 'send'} className={submitting ? 'animate-spin' : ''} />

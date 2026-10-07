@@ -25,7 +25,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   field_too_long: '입력한 내용이 너무 깁니다.',
   invalid_category: '카테고리를 다시 선택해 주세요.',
   invalid_file_type: 'JPG, PNG, GIF, WEBP 이미지만 첨부할 수 있습니다.',
-  file_too_large: '사진 용량이 너무 큽니다. 8MB 이하로 올려 주세요.',
+  file_too_large: '사진 용량이 너무 큽니다. 3MB 이하로 올려 주세요.',
   rate_limited: '요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.',
   not_found: '존재하지 않는 습득물입니다.',
   own_item: '내가 신고한 물건은 수령 신청할 수 없습니다.',

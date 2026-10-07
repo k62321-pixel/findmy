@@ -21,14 +21,14 @@ from functools import wraps
 
 import jwt
 from dotenv import load_dotenv
-from flask import Flask, jsonify, make_response, request, send_from_directory
+from flask import Flask, Response, jsonify, make_response, request
 from flask_cors import CORS
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token
 
 load_dotenv()
 
-from db import DATA_DIR, get_connection, init_db  # noqa: E402 — DATA_DIR reads .env
+from db import IS_POSTGRES, get_connection, init_db  # noqa: E402 — db reads DATABASE_URL from .env
 
 
 def _csv_env(name, default=""):
@@ -65,8 +65,9 @@ SESSION_TTL_SECONDS = int(timedelta(days=7).total_seconds())
 COOKIE_SAMESITE = os.environ.get("SESSION_COOKIE_SAMESITE", "Lax")
 COOKIE_SECURE = IS_PRODUCTION or COOKIE_SAMESITE == "None"
 
-UPLOAD_DIR = DATA_DIR / "uploads"
-UPLOAD_DIR.mkdir(exist_ok=True)
+# The frontend shrinks photos to ~300KB before upload; this cap keeps the free
+# database tier (Neon: 0.5GB) from being eaten by a few uncompressed originals.
+MAX_PHOTO_BYTES = 3 * 1024 * 1024
 ALLOWED_CATEGORIES = {"electronics", "clothing", "wallet", "books", "etc"}
 DEFAULT_STORAGE_LOCATION = "학생회관 1층 분실물 센터"
 MAX_NAME_LENGTH = 100
@@ -74,12 +75,14 @@ MAX_LOCATION_LENGTH = 200
 MAX_DESCRIPTION_LENGTH = 1000
 
 app = Flask(__name__)
-app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024  # 8MB, generous for a phone photo
+app.config["MAX_CONTENT_LENGTH"] = MAX_PHOTO_BYTES + 64 * 1024  # photo + the text fields
 CORS(app, supports_credentials=True, origins=FRONTEND_ORIGINS)
 
 _google_request = google_requests.Request()
 init_db()
 
+if IS_PRODUCTION and not IS_POSTGRES:
+    app.logger.warning("DATABASE_URL is not set — using local SQLite, which free hosts wipe on restart.")
 if not ALLOWED_EMAIL_DOMAINS:
     app.logger.warning("ALLOWED_EMAIL_DOMAINS is empty — any Google account can sign in.")
 if not ADMIN_EMAILS:
@@ -292,16 +295,16 @@ def _fetch_item(conn, item_id):
     return conn.execute("SELECT * FROM items WHERE id = ?", (item_id,)).fetchone()
 
 
-# Magic bytes → extension. The client-supplied filename/extension is never trusted.
-def _detect_image_ext(head):
+# Magic bytes → (extension, MIME type). The client-supplied filename/type is never trusted.
+def _detect_image(head):
     if head.startswith(b"\x89PNG\r\n\x1a\n"):
-        return ".png"
+        return ".png", "image/png"
     if head.startswith(b"\xff\xd8\xff"):
-        return ".jpg"
+        return ".jpg", "image/jpeg"
     if head[:6] in (b"GIF87a", b"GIF89a"):
-        return ".gif"
+        return ".gif", "image/gif"
     if head[:4] == b"RIFF" and head[8:12] == b"WEBP":
-        return ".webp"
+        return ".webp", "image/webp"
     return None
 
 
@@ -362,21 +365,26 @@ def create_item(user):
         return jsonify(error="rate_limited"), 429
 
     photo = request.files.get("photo")
-    ext = None
+    photo_data = image_filename = content_type = None
     if photo and photo.filename:
-        ext = _detect_image_ext(photo.stream.read(12))
-        photo.stream.seek(0)
-        if not ext:
+        photo_data = photo.read(MAX_PHOTO_BYTES + 1)
+        if len(photo_data) > MAX_PHOTO_BYTES:
+            return jsonify(error="file_too_large"), 413
+        detected = _detect_image(photo_data[:12])
+        if not detected:
             return jsonify(error="invalid_file_type"), 400
+        ext, content_type = detected
+        image_filename = f"{uuid.uuid4().hex}{ext}"
 
     item_id = f"itm-{uuid.uuid4().hex[:12]}"
-    image_filename = f"{uuid.uuid4().hex}{ext}" if ext else None
     now = _now()
 
-    if image_filename:
-        photo.save(UPLOAD_DIR / image_filename)
-
     with get_connection() as conn:
+        if image_filename:
+            conn.execute(
+                "INSERT INTO images (filename, content_type, data) VALUES (?, ?, ?)",
+                (image_filename, content_type, photo_data),
+            )
         conn.execute(
             """
             INSERT INTO items (
@@ -492,16 +500,23 @@ def delete_item(user, item_id):
         if not row:
             return jsonify(error="not_found"), 404
         conn.execute("DELETE FROM items WHERE id = ?", (item_id,))
+        if row["image_filename"]:
+            conn.execute("DELETE FROM images WHERE filename = ?", (row["image_filename"],))
 
-    if row["image_filename"]:
-        (UPLOAD_DIR / row["image_filename"]).unlink(missing_ok=True)
     app.logger.info("Admin %s deleted item %s", user["email"], item_id)
     return jsonify(ok=True)
 
 
-@app.get("/api/uploads/<path:filename>")
+@app.get("/api/uploads/<filename>")
 def uploaded_file(filename):
-    return send_from_directory(UPLOAD_DIR, filename, max_age=60 * 60 * 24 * 30)
+    with get_connection() as conn:
+        row = conn.execute("SELECT content_type, data FROM images WHERE filename = ?", (filename,)).fetchone()
+    if not row:
+        return jsonify(error="not_found"), 404
+    response = Response(bytes(row["data"]), mimetype=row["content_type"])
+    # Filenames are random and never reused, so the photo can be cached for good.
+    response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    return response
 
 
 if __name__ == "__main__":
