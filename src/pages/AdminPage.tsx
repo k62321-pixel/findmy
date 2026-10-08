@@ -64,7 +64,7 @@ export function AdminPage() {
           ) : visible.length > 0 ? (
             visible.map((item) => <ItemRow key={item.id} item={item} note={noteFor(item)} />)
           ) : (
-            <EmptyState icon="inventory_2" title={TABS.find((t) => t.id === tab)!.empty} />
+            <EmptyState imageSrc="/images/empty-box.png" title={TABS.find((t) => t.id === tab)!.empty}/>
           )}
         </div>
       </section>
