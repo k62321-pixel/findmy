@@ -81,7 +81,7 @@ export function HomePage() {
           </div>
         ) : (
           <EmptyState
-            icon="inventory_2"
+            imageSrc="image-removebg-preview%20(2).png"
             title="아직 등록된 습득물이 없습니다"
             description="캠퍼스에서 물건을 주우셨다면 가장 먼저 신고해 주세요."
             action={
