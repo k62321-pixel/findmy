@@ -124,9 +124,9 @@ This design system utilizes a professional palette rooted in educational traditi
 
 ## Typography
 
-The system uses **Pretendard** for every text role, since it covers both Hangul and Latin, and **Black Han Sans** as a display face for the site name and the home hero heading. 
+The system uses **Pretendard** for every text role, since it covers both Hangul and Latin, and **IBM Plex Sans KR** (bold) as a display face for the site name and the home hero heading. 
 
-Pretendard keeps Korean labels and lists even and easy to scan on every device, instead of falling back to whatever system font happens to be installed. Black Han Sans is bold and compact, echoing the school crest; use it only for those two brand moments. 
+Pretendard keeps Korean labels and lists even and easy to scan on every device, instead of falling back to whatever system font happens to be installed. IBM Plex Sans KR in bold gives the site name a sturdy, slightly technical character; use it only for those two brand moments. 
 
 **Usage Guidelines:**
 - Use `headline-xl` only for main landing sections or hero headers.

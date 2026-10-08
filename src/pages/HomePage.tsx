@@ -27,7 +27,7 @@ export function HomePage() {
         <div className="flex w-full max-w-xl flex-col gap-6">
           <div className="flex flex-col items-center gap-3 text-center">
             <img src="/image-removebg-preview(2).png" alt="경북일고 교표" className="h-20 w-20 object-contain md:h-24 md:w-24" />
-            <h2 className="break-keep font-display text-[28px] leading-tight text-on-surface md:text-[40px]">
+            <h2 className="break-keep font-display text-[26px] font-bold leading-tight tracking-tight text-on-surface md:text-[40px]">
               분실물을 신고하거나 찾아보세요!
             </h2>
             <p className="max-w-md break-keep font-body-md text-body-md text-on-surface-variant">

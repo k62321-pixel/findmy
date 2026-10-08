@@ -43,7 +43,7 @@ export function AppHeader({ title, back = false, actions = true }: AppHeaderProp
           ) : (
             <BrandMark />
           )}
-          <h1 className="truncate font-display text-[22px] leading-none tracking-tight text-primary sm:text-[26px]">{title}</h1>
+          <h1 className="truncate font-display text-[20px] font-bold leading-none tracking-tight text-primary sm:text-[26px]">{title}</h1>
         </div>
 
         {actions ? (

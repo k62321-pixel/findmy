@@ -61,7 +61,7 @@ export default {
       },
       fontFamily: {
         // Korean display face for the site name and hero heading.
-        display: ['"Black Han Sans"', ...SANS],
+        display: ['"IBM Plex Sans KR"', ...SANS],
         'headline-xl': SANS,
         'headline-lg': SANS,
         'headline-lg-mobile': SANS,
