@@ -75,7 +75,7 @@ def get_connection() -> Iterator[Connection]:
         raw.close()
 
 
-def init_db() -> None:
+def init_db(storage_location: str) -> None:
     blob = "BYTEA" if IS_POSTGRES else "BLOB"
     with get_connection() as conn:
         conn.execute(
@@ -114,5 +114,19 @@ def init_db() -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS inquiries (
+                id TEXT PRIMARY KEY,
+                content TEXT NOT NULL,
+                author_sub TEXT NOT NULL,
+                author_name TEXT NOT NULL,
+                author_email TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        # Items reported before the storage place was renamed follow the new name.
+        conn.execute("UPDATE items SET storage = ? WHERE storage <> ?", (storage_location, storage_location))
         conn.execute("CREATE INDEX IF NOT EXISTS idx_items_reporter ON items(reporter_sub)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_items_claimant ON items(claimant_sub)")

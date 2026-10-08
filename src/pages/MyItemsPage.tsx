@@ -19,12 +19,12 @@ export function MyItemsPage() {
   const visible = tab === 'reported' ? reported : claimed
 
   return (
-    <AppShell title="My Items">
+    <AppShell title="내 물건">
       <section className="flex flex-col gap-6 px-margin-mobile py-8 md:px-margin-desktop">
         <div className="flex flex-col gap-2">
           <h2 className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">내 물건</h2>
           <p className="font-body-md text-body-md text-on-surface-variant">
-            내가 신고한 습득물과 수령 신청한 물건의 상태를 확인할 수 있습니다. 분실물 센터 담당자가 본인 확인을
+            내가 신고한 습득물과 수령 신청한 물건의 상태를 확인할 수 있습니다. 1층 교무실 담당자가 본인 확인을
             마치면 반환완료로 바뀝니다.
           </p>
         </div>

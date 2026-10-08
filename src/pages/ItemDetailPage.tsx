@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { AppShell } from '../components/AppShell'
 import { ClaimDialog } from '../components/ClaimDialog'
@@ -23,18 +23,19 @@ export function ItemDetailPage() {
   const [claiming, setClaiming] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [viewingPhoto, setViewingPhoto] = useState(false)
   const item = getItem(id)
 
   if (!item) {
     if (itemsStatus === 'loading') {
       return (
-        <AppShell title="Item Details" back headerActions={false} nav={false}>
+        <AppShell title="물품 상세" back headerActions={false} nav={false}>
           <LoadingSpinner className="h-[60vh]" />
         </AppShell>
       )
     }
     return (
-      <AppShell title="Item Details" back nav={false}>
+      <AppShell title="물품 상세" back nav={false}>
         <div className="px-margin-mobile py-12">
           {itemsStatus === 'error' ? (
             <LoadError />
@@ -80,9 +81,9 @@ export function ItemDetailPage() {
   }
 
   return (
-    <AppShell title="Item Details" back headerActions={false} nav={false}>
+    <AppShell title="물품 상세" back headerActions={false} nav={false}>
       <div className="relative flex w-full flex-col">
-        <div className="relative h-[320px] w-full sm:h-[400px]">
+        <div className="relative h-[320px] w-full bg-surface-container sm:h-[400px]">
           <ItemThumb
             src={item.imageUrl}
             alt={item.name}
@@ -90,9 +91,21 @@ export function ItemDetailPage() {
             className={`h-full w-full ${returned ? 'grayscale' : ''}`}
             glyphSize={96}
           />
-          <div className="absolute bottom-margin-mobile left-margin-mobile flex gap-2">
+          {item.imageUrl ? (
+            <button
+              type="button"
+              onClick={() => setViewingPhoto(true)}
+              aria-label="사진 크게 보기"
+              className="absolute inset-0 cursor-zoom-in"
+            >
+              <span className="absolute right-margin-mobile top-margin-mobile flex h-10 w-10 items-center justify-center rounded-full bg-inverse-surface/50 text-inverse-on-surface">
+                <Icon name="fullscreen" />
+              </span>
+            </button>
+          ) : null}
+          <div className="pointer-events-none absolute bottom-10 left-margin-mobile flex gap-2">
             <StatusChip status={item.status} size="md" />
-            <span className="rounded-full bg-surface-container-highest px-3 py-1 font-label-md text-label-md text-on-surface shadow-sm">
+            <span className="rounded-full bg-surface-container-lowest/90 px-3 py-1 font-label-md text-label-md text-on-surface shadow-sm backdrop-blur">
               {categoryOf(item.category).label}
             </span>
           </div>
@@ -155,6 +168,10 @@ export function ItemDetailPage() {
           </div>
         </div>
       </div>
+
+      {viewingPhoto && item.imageUrl ? (
+        <PhotoViewer src={item.imageUrl} alt={item.name} onClose={() => setViewingPhoto(false)} />
+      ) : null}
 
       {claiming ? (
         <ClaimDialog
@@ -302,7 +319,8 @@ function AdminPanel({ item }: { item: LostItem }) {
         ) : null}
         {item.status === 'returned' ? (
           <button type="button" disabled={busy} onClick={() => run(() => setItemStatus(item.id, 'stored'))} className={outline}>
-            보관중으로 되돌리기
+            {/* The server keeps the pickup request when undoing a return that had one. */}
+            {info?.claimantEmail ? '반환 취소 (수령 신청 상태로)' : '보관중으로 되돌리기'}
           </button>
         ) : null}
       </div>
@@ -350,6 +368,42 @@ function Fact({ icon, label, value }: { icon: string; label: string; value: stri
         <span className="font-label-md text-label-md">{label}</span>
       </div>
       <p className="break-words font-body-md text-body-md text-on-surface">{value}</p>
+    </div>
+  )
+}
+
+/** Full-screen photo overlay; closes on tap anywhere or Escape. */
+function PhotoViewer({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKey)
+    const overflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = overflow
+    }
+  }, [onClose])
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${alt} 사진`}
+      onClick={onClose}
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/90 p-2"
+    >
+      <img src={src} alt={alt} className="max-h-full max-w-full object-contain" />
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="닫기"
+        className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-white/15 text-white transition-colors hover:bg-white/25"
+      >
+        <Icon name="close" />
+      </button>
     </div>
   )
 }

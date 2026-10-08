@@ -27,13 +27,14 @@ const ERROR_MESSAGES: Record<string, string> = {
   invalid_file_type: 'JPG, PNG, GIF, WEBP 이미지만 첨부할 수 있습니다.',
   file_too_large: '사진 용량이 너무 큽니다. 3MB 이하로 올려 주세요.',
   rate_limited: '신고는 1시간에 10건까지 할 수 있습니다. 잠시 후 다시 시도해 주세요.',
-  too_many_claims: '수령 신청은 동시에 3건까지 할 수 있습니다. 분실물 센터를 방문해 먼저 처리해 주세요.',
+  too_many_claims: '수령 신청은 동시에 3건까지 할 수 있습니다. 1층 교무실을 방문해 먼저 처리해 주세요.',
   not_found: '존재하지 않는 습득물입니다.',
   own_item: '내가 신고한 물건은 수령 신청할 수 없습니다.',
   already_requested: '이미 다른 사람이 수령 신청한 물건입니다.',
   already_returned: '이미 반환된 물건입니다.',
   not_claimant: '내가 신청한 건만 취소할 수 있습니다.',
   invalid_status: '잘못된 상태 값입니다.',
+  inquiry_rate_limited: '문의는 1시간에 5건까지 보낼 수 있습니다. 잠시 후 다시 시도해 주세요.',
 }
 
 export function errorMessage(code: string | undefined, fallback: string): string {

@@ -1,18 +1,31 @@
-import { useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { createPortal } from 'react-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { Icon } from './Icon'
+import { InquiryDialog } from './InquiryDialog'
 import { useAuth } from '../store/AuthProvider'
 
 interface AppHeaderProps {
   title: string
   /** Shows a back arrow instead of the brand mark. */
   back?: boolean
-  /** Notification bell + account area on the right. */
+  /** Inquiry button + account area on the right. */
   actions?: boolean
 }
 
 export function AppHeader({ title, back = false, actions = true }: AppHeaderProps) {
   const navigate = useNavigate()
+  const location = useLocation()
   const { user, logout } = useAuth()
+  const [inquiring, setInquiring] = useState(false)
+
+  function openInquiry() {
+    if (!user) {
+      navigate('/login', { state: { from: location } })
+      return
+    }
+    setInquiring(true)
+  }
 
   return (
     <header className="fixed inset-x-0 top-0 z-50 bg-surface/80 pt-safe shadow-bar backdrop-blur-xl">
@@ -30,17 +43,18 @@ export function AppHeader({ title, back = false, actions = true }: AppHeaderProp
           ) : (
             <BrandMark />
           )}
-          <h1 className="truncate font-headline-md text-headline-md text-primary">{title}</h1>
+          <h1 className="truncate font-display text-[20px] font-bold leading-none tracking-tight text-primary sm:text-[26px]">{title}</h1>
         </div>
 
         {actions ? (
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             <button
               type="button"
-              aria-label="알림"
-              className="flex h-11 w-11 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-variant"
+              onClick={openInquiry}
+              className="flex h-9 shrink-0 items-center gap-1 rounded-full px-2.5 font-label-sm text-label-sm text-on-surface-variant outline outline-1 outline-outline-variant transition-colors hover:bg-surface-variant"
             >
-              <Icon name="notifications" />
+              <Icon name="support_agent" size={18} />
+              문의사항
             </button>
 
             {user ? (
@@ -63,9 +77,11 @@ export function AppHeader({ title, back = false, actions = true }: AppHeaderProp
                 <button
                   type="button"
                   onClick={() => logout()}
-                  className="font-label-sm text-label-sm text-on-surface-variant transition-colors hover:text-on-surface"
+                  aria-label="로그아웃"
+                  className="flex items-center font-label-sm text-label-sm text-on-surface-variant transition-colors hover:text-on-surface"
                 >
-                  로그아웃
+                  <Icon name="logout" size={20} className="sm:hidden" />
+                  <span className="hidden sm:inline">로그아웃</span>
                 </button>
               </div>
             ) : (
@@ -80,17 +96,20 @@ export function AppHeader({ title, back = false, actions = true }: AppHeaderProp
           </div>
         ) : null}
       </div>
+      {/* Portaled: the header's backdrop-filter would otherwise confine the fixed overlay. */}
+      {inquiring ? createPortal(<InquiryDialog onClose={() => setInquiring(false)} />, document.body) : null}
     </header>
   )
 }
 
+/** School crest; absolute path so it resolves on nested routes like /items/:id. */
 function BrandMark() {
   return (
-    <span
+    <img
+      src="/image-removebg-preview(2).png"
+      alt=""
       aria-hidden="true"
-      className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-primary text-on-primary"
-    >
-      <Icon name="school" size={20} filled />
-    </span>
+      className="h-9 w-9 shrink-0 object-contain"
+    />
   )
 }

@@ -1,4 +1,14 @@
-export type CategoryId = 'electronics' | 'clothing' | 'wallet' | 'books' | 'etc'
+export type CategoryId =
+  | 'electronics'
+  | 'stationery'
+  | 'books'
+  | 'clothing'
+  | 'wallet'
+  | 'bottle'
+  | 'umbrella'
+  | 'bag'
+  | 'accessory'
+  | 'etc'
 
 /**
  * 보관중 = at the lost & found desk, 수령 신청됨 = someone asked to pick it up,
@@ -41,4 +51,13 @@ export interface Category {
   id: CategoryId
   label: string
   icon: string
+}
+
+/** A user-submitted inquiry (문의사항). Only admins can list them. */
+export interface Inquiry {
+  id: string
+  content: string
+  authorName: string
+  authorEmail: string
+  createdAt: string
 }

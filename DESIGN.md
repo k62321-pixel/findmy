@@ -50,43 +50,43 @@ colors:
   surface-variant: '#d3e4fe'
 typography:
   headline-xl:
-    fontFamily: Manrope
+    fontFamily: Pretendard
     fontSize: 40px
     fontWeight: '700'
     lineHeight: 48px
   headline-lg:
-    fontFamily: Manrope
+    fontFamily: Pretendard
     fontSize: 32px
     fontWeight: '600'
     lineHeight: 40px
   headline-lg-mobile:
-    fontFamily: Manrope
+    fontFamily: Pretendard
     fontSize: 24px
     fontWeight: '600'
     lineHeight: 32px
   headline-md:
-    fontFamily: Manrope
+    fontFamily: Pretendard
     fontSize: 24px
     fontWeight: '600'
     lineHeight: 32px
   body-lg:
-    fontFamily: Plus Jakarta Sans
+    fontFamily: Pretendard
     fontSize: 18px
     fontWeight: '400'
     lineHeight: 28px
   body-md:
-    fontFamily: Plus Jakarta Sans
+    fontFamily: Pretendard
     fontSize: 16px
     fontWeight: '400'
     lineHeight: 24px
   label-md:
-    fontFamily: Plus Jakarta Sans
+    fontFamily: Pretendard
     fontSize: 14px
     fontWeight: '600'
     lineHeight: 20px
     letterSpacing: 0.02em
   label-sm:
-    fontFamily: Plus Jakarta Sans
+    fontFamily: Pretendard
     fontSize: 12px
     fontWeight: '500'
     lineHeight: 16px
@@ -124,9 +124,9 @@ This design system utilizes a professional palette rooted in educational traditi
 
 ## Typography
 
-The system uses a pairing of **Manrope** for structural headers and **Plus Jakarta Sans** for body and interface elements. 
+The system uses **Pretendard** for every text role, since it covers both Hangul and Latin, and **IBM Plex Sans KR** (bold) as a display face for the site name and the home hero heading. 
 
-Manrope provides a modern, semi-geometric look for headlines that feels professional and technical. Plus Jakarta Sans offers softer terminals and a friendly "double-story" lowercase 'a', making long lists of items easier to scan and more welcoming for students. 
+Pretendard keeps Korean labels and lists even and easy to scan on every device, instead of falling back to whatever system font happens to be installed. IBM Plex Sans KR in bold gives the site name a sturdy, slightly technical character; use it only for those two brand moments. 
 
 **Usage Guidelines:**
 - Use `headline-xl` only for main landing sections or hero headers.

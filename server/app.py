@@ -67,8 +67,13 @@ COOKIE_SECURE = IS_PRODUCTION or COOKIE_SAMESITE == "None"
 # The frontend shrinks photos to ~300KB before upload; this cap keeps the free
 # database tier (Neon: 0.5GB) from being eaten by a few uncompressed originals.
 MAX_PHOTO_BYTES = 3 * 1024 * 1024
-ALLOWED_CATEGORIES = {"electronics", "clothing", "wallet", "books", "etc"}
-DEFAULT_STORAGE_LOCATION = "학생회관 1층 분실물 센터"
+ALLOWED_CATEGORIES = {
+    "electronics", "stationery", "books", "clothing", "wallet",
+    "bottle", "umbrella", "bag", "accessory", "etc",
+}
+DEFAULT_STORAGE_LOCATION = "1층 교무실"
+MAX_INQUIRY_LENGTH = 1000
+MAX_INQUIRIES_PER_HOUR = 5
 MAX_NAME_LENGTH = 100
 MAX_LOCATION_LENGTH = 200
 MAX_DESCRIPTION_LENGTH = 1000
@@ -88,7 +93,7 @@ app.config["MAX_CONTENT_LENGTH"] = MAX_PHOTO_BYTES + 64 * 1024  # photo + the te
 CORS(app, supports_credentials=True, origins=FRONTEND_ORIGINS)
 
 _google_request = google_requests.Request()
-init_db()
+init_db(DEFAULT_STORAGE_LOCATION)
 
 if IS_PRODUCTION and not IS_POSTGRES:
     app.logger.warning("DATABASE_URL is not set — using local SQLite, which free hosts wipe on restart.")
@@ -472,15 +477,23 @@ def cancel_claim(user, item_id):
 @app.post("/api/items/<item_id>/status")
 @admin_required
 def set_item_status(user, item_id):
-    """Admin only. 'returned' confirms a handover; 'stored' rejects a request or undoes a return."""
+    """Admin only. 'returned' confirms a handover; 'stored' rejects a request or undoes a return
+    (an undone return that had a pickup request goes back to 'requested', not 'stored')."""
     status = (request.get_json(silent=True) or {}).get("status")
     if status not in ("stored", "returned"):
         return jsonify(error="invalid_status"), 400
 
     with get_connection() as conn:
-        if not _fetch_item(conn, item_id):
+        row = _fetch_item(conn, item_id)
+        if not row:
             return jsonify(error="not_found"), 404
-        if status == "returned":
+        if status == "stored" and row["status"] == "returned" and row["claimant_sub"]:
+            # Undoing a return keeps the pickup request: back to 'requested', claimant intact.
+            conn.execute(
+                "UPDATE items SET status = 'requested', resolved_by = NULL, resolved_at = NULL WHERE id = ?",
+                (item_id,),
+            )
+        elif status == "returned":
             conn.execute(
                 "UPDATE items SET status = 'returned', resolved_by = ?, resolved_at = ? WHERE id = ?",
                 (user["email"], _now(), item_id),
@@ -513,6 +526,67 @@ def delete_item(user, item_id):
             conn.execute("DELETE FROM images WHERE filename = ?", (row["image_filename"],))
 
     app.logger.info("Admin %s deleted item %s", user["email"], item_id)
+    return jsonify(ok=True)
+
+
+# ---------------------------------------------------------------------------
+# Inquiries (문의사항)
+# ---------------------------------------------------------------------------
+
+def _serialize_inquiry(row):
+    return {
+        "id": row["id"],
+        "content": row["content"],
+        "authorName": row["author_name"],
+        "authorEmail": row["author_email"],
+        "createdAt": row["created_at"],
+    }
+
+
+@app.post("/api/inquiries")
+@login_required
+def create_inquiry(user):
+    content = ((request.get_json(silent=True) or {}).get("content") or "").strip()
+    if not content:
+        return jsonify(error="missing_fields"), 400
+    if len(content) > MAX_INQUIRY_LENGTH:
+        return jsonify(error="field_too_long"), 400
+
+    with get_connection() as conn:
+        if not _is_admin(user):
+            an_hour_ago = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+            recent = conn.execute(
+                "SELECT COUNT(*) AS n FROM inquiries WHERE author_sub = ? AND created_at > ?",
+                (user["sub"], an_hour_ago),
+            ).fetchone()["n"]
+            if recent >= MAX_INQUIRIES_PER_HOUR:
+                return jsonify(error="inquiry_rate_limited"), 429
+        conn.execute(
+            """
+            INSERT INTO inquiries (id, content, author_sub, author_name, author_email, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (f"inq-{uuid.uuid4().hex[:12]}", content, user["sub"], user["name"], user["email"], _now()),
+        )
+
+    return jsonify(ok=True), 201
+
+
+@app.get("/api/inquiries")
+@admin_required
+def list_inquiries(user):
+    with get_connection() as conn:
+        rows = conn.execute("SELECT * FROM inquiries ORDER BY created_at DESC").fetchall()
+    return jsonify(inquiries=[_serialize_inquiry(row) for row in rows])
+
+
+@app.delete("/api/inquiries/<inquiry_id>")
+@admin_required
+def delete_inquiry(user, inquiry_id):
+    with get_connection() as conn:
+        deleted = conn.execute("DELETE FROM inquiries WHERE id = ?", (inquiry_id,)).rowcount
+    if not deleted:
+        return jsonify(error="not_found"), 404
     return jsonify(ok=True)
 
 
