@@ -1,11 +1,11 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AppShell } from '../components/AppShell'
 import { Icon } from '../components/Icon'
 import { CATEGORIES } from '../lib/categories'
 import { compressImage } from '../lib/image'
 import { useItems } from '../store/ItemsProvider'
-import type { CategoryId } from '../types'
+import type { CategoryId, LostItem } from '../types'
 
 // Listing concrete types (not image/*) makes iOS convert HEIC photos to JPEG on upload.
 const ACCEPTED_IMAGE_TYPES = 'image/jpeg,image/png,image/gif,image/webp'
@@ -32,6 +32,7 @@ export function ReportPage() {
   const [submitting, setSubmitting] = useState(false)
   const [processingPhoto, setProcessingPhoto] = useState(false)
   const [submitError, setSubmitError] = useState('')
+  const [reported, setReported] = useState<LostItem | null>(null)
 
   function validate(): FormErrors {
     const next: FormErrors = {}
@@ -57,7 +58,7 @@ export function ReportPage() {
         description: details,
         photo: photo?.file,
       })
-      navigate(`/items/${item.id}`, { replace: true })
+      setReported(item)
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : '신고 등록에 실패했습니다. 다시 시도해 주세요.')
       setSubmitting(false)
@@ -100,7 +101,7 @@ export function ReportPage() {
           <div className="flex flex-col gap-2">
             <h2 className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">분실물 신고</h2>
             <p className="font-body-md text-body-md text-on-surface-variant">
-              물건을 찾으셨나요? 아래에 정보를 입력해 주시면 주인을 찾는 데 도움이 됩니다.
+              아래에 자신이 습득한 분실물의 정보를 입력하세요. 그 후 신고하기 버튼을 누른 다음 물건을 1층 교무실로 가져다 주세요.
             </p>
           </div>
 
@@ -242,6 +243,13 @@ export function ReportPage() {
           </div>
         </div>
       </form>
+
+      {reported ? (
+        <ReportedDialog
+          storage={reported.storage}
+          onClose={() => navigate(`/items/${reported.id}`, { replace: true })}
+        />
+      ) : null}
     </AppShell>
   )
 }
@@ -271,6 +279,55 @@ function Field({
           {error}
         </p>
       ) : null}
+    </div>
+  )
+}
+
+/** Shown once the report is saved: the finder still has to hand the item in. */
+function ReportedDialog({ storage, onClose }: { storage: string; onClose: () => void }) {
+  const confirmRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    confirmRef.current?.focus()
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-end justify-center bg-inverse-surface/40 p-4 backdrop-blur-sm sm:items-center"
+      onClick={onClose}
+    >
+      <div
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="reported-title"
+        onClick={(e) => e.stopPropagation()}
+        className="flex w-full max-w-md flex-col gap-4 rounded-xl bg-surface-container-lowest p-6 shadow-level2"
+      >
+        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary-container text-on-secondary-container">
+          <Icon name="check_circle" />
+        </span>
+        <div className="flex flex-col gap-1">
+          <h2 id="reported-title" className="font-headline-md text-headline-md text-on-surface">
+            신고가 접수되었습니다
+          </h2>
+          <p className="font-body-md text-body-md text-on-surface-variant">
+            해당 물품을 <strong className="text-on-surface">{storage}</strong>로 가져다주세요.
+          </p>
+        </div>
+        <button
+          ref={confirmRef}
+          type="button"
+          onClick={onClose}
+          className="mt-2 h-12 w-full rounded-md bg-primary font-label-md text-label-md text-on-primary shadow-level1 transition-transform active:scale-[0.98]"
+        >
+          확인
+        </button>
+      </div>
     </div>
   )
 }

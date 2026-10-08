@@ -10,6 +10,7 @@ import { LoadingSpinner } from '../components/LoadingSpinner'
 import { SearchField } from '../components/SearchField'
 import { filterItems } from '../lib/filter'
 import { useItems } from '../store/ItemsProvider'
+import { SITE_TITLE } from '../lib/site'
 import type { CategoryId } from '../types'
 
 export function BrowsePage() {
@@ -25,8 +26,16 @@ export function BrowsePage() {
   const results = useMemo(() => filterItems(items, query, category), [items, query, category])
 
   return (
-    <AppShell title="Home">
+    <AppShell title={SITE_TITLE}>
       <section className="sticky top-16 z-20 flex flex-col gap-4 bg-surface-container-lowest px-margin-mobile pb-6 pt-4 shadow-[0_4px_20px_rgba(0,0,0,0.02)] md:px-margin-desktop">
+        <div className="flex items-start gap-3 rounded-md bg-surface-container-low p-3">
+          <Icon name="info" size={20} className="mt-0.5 shrink-0 text-primary" />
+          <p className="font-body-md text-body-md text-on-surface-variant">
+            신고된 물건 중 자신의 물건이 있다면 해당 게시물을 클릭하여 '내 물건 찾기'를 누르고, 1층 교무실로 물건을
+            찾으러 가세요.
+          </p>
+        </div>
+
         <SearchField value={query} onChange={setQuery} />
 
         <Link

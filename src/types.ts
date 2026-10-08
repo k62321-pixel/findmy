@@ -42,3 +42,12 @@ export interface Category {
   label: string
   icon: string
 }
+
+/** A user-submitted inquiry (문의사항). Only admins can list them. */
+export interface Inquiry {
+  id: string
+  content: string
+  authorName: string
+  authorEmail: string
+  createdAt: string
+}

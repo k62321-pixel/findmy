@@ -1,18 +1,31 @@
-import { useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { createPortal } from 'react-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { Icon } from './Icon'
+import { InquiryDialog } from './InquiryDialog'
 import { useAuth } from '../store/AuthProvider'
 
 interface AppHeaderProps {
   title: string
   /** Shows a back arrow instead of the brand mark. */
   back?: boolean
-  /** Notification bell + account area on the right. */
+  /** Inquiry button + account area on the right. */
   actions?: boolean
 }
 
 export function AppHeader({ title, back = false, actions = true }: AppHeaderProps) {
   const navigate = useNavigate()
+  const location = useLocation()
   const { user, logout } = useAuth()
+  const [inquiring, setInquiring] = useState(false)
+
+  function openInquiry() {
+    if (!user) {
+      navigate('/login', { state: { from: location } })
+      return
+    }
+    setInquiring(true)
+  }
 
   return (
     <header className="fixed inset-x-0 top-0 z-50 bg-surface/80 pt-safe shadow-bar backdrop-blur-xl">
@@ -30,17 +43,18 @@ export function AppHeader({ title, back = false, actions = true }: AppHeaderProp
           ) : (
             <BrandMark />
           )}
-          <h1 className="truncate font-headline-md text-headline-md text-primary">{title}</h1>
+          <h1 className="line-clamp-2 break-keep font-headline-md text-[15px] leading-tight text-primary sm:text-headline-md">{title}</h1>
         </div>
 
         {actions ? (
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <button
               type="button"
-              aria-label="알림"
-              className="flex h-11 w-11 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-variant"
+              onClick={openInquiry}
+              className="flex h-9 shrink-0 items-center gap-1 rounded-full px-3 font-label-sm text-label-sm text-on-surface-variant outline outline-1 outline-outline-variant transition-colors hover:bg-surface-variant"
             >
-              <Icon name="notifications" />
+              <Icon name="support_agent" size={18} />
+              문의사항
             </button>
 
             {user ? (
@@ -80,6 +94,8 @@ export function AppHeader({ title, back = false, actions = true }: AppHeaderProp
           </div>
         ) : null}
       </div>
+      {/* Portaled: the header's backdrop-filter would otherwise confine the fixed overlay. */}
+      {inquiring ? createPortal(<InquiryDialog onClose={() => setInquiring(false)} />, document.body) : null}
     </header>
   )
 }
