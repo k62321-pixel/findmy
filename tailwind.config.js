@@ -2,6 +2,9 @@
  * Tailwind theme generated from DESIGN.md (Academic Continuity System).
  * Every token here maps 1:1 to the frontmatter of DESIGN.md — keep them in sync.
  */
+// Pretendard covers Hangul and Latin, so one family serves every text role.
+const SANS = ['"Pretendard Variable"', 'Pretendard', 'system-ui', 'sans-serif']
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
@@ -57,20 +60,22 @@ export default {
         'surface-variant': '#d3e4fe',
       },
       fontFamily: {
-        'headline-xl': ['Manrope', 'system-ui', 'sans-serif'],
-        'headline-lg': ['Manrope', 'system-ui', 'sans-serif'],
-        'headline-lg-mobile': ['Manrope', 'system-ui', 'sans-serif'],
-        'headline-md': ['Manrope', 'system-ui', 'sans-serif'],
-        'body-lg': ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
-        'body-md': ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
-        'label-md': ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
-        'label-sm': ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
+        // Korean display face for the site name and hero heading.
+        display: ['"Black Han Sans"', ...SANS],
+        'headline-xl': SANS,
+        'headline-lg': SANS,
+        'headline-lg-mobile': SANS,
+        'headline-md': SANS,
+        'body-lg': SANS,
+        'body-md': SANS,
+        'label-md': SANS,
+        'label-sm': SANS,
       },
       fontSize: {
-        'headline-xl': ['40px', { lineHeight: '48px', fontWeight: '700' }],
-        'headline-lg': ['32px', { lineHeight: '40px', fontWeight: '600' }],
-        'headline-lg-mobile': ['24px', { lineHeight: '32px', fontWeight: '600' }],
-        'headline-md': ['24px', { lineHeight: '32px', fontWeight: '600' }],
+        'headline-xl': ['40px', { lineHeight: '48px', fontWeight: '800', letterSpacing: '-0.02em' }],
+        'headline-lg': ['32px', { lineHeight: '40px', fontWeight: '700', letterSpacing: '-0.02em' }],
+        'headline-lg-mobile': ['24px', { lineHeight: '32px', fontWeight: '700', letterSpacing: '-0.02em' }],
+        'headline-md': ['24px', { lineHeight: '32px', fontWeight: '700', letterSpacing: '-0.01em' }],
         'body-lg': ['18px', { lineHeight: '28px', fontWeight: '400' }],
         'body-md': ['16px', { lineHeight: '24px', fontWeight: '400' }],
         'label-md': ['14px', { lineHeight: '20px', letterSpacing: '0.02em', fontWeight: '600' }],
