@@ -91,7 +91,7 @@ export function ReportPage() {
   }
 
   return (
-    <AppShell title="Report Item">
+    <AppShell title="분실물 신고">
       <form
         onSubmit={handleSubmit}
         noValidate
@@ -100,7 +100,7 @@ export function ReportPage() {
         <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-2">
             <h2 className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">분실물 신고</h2>
-            <p className="font-body-md text-body-md text-on-surface-variant">
+            <p className="break-keep font-body-md text-body-md text-on-surface-variant">
               아래에 자신이 습득한 분실물의 정보를 입력하세요. 그 후 신고하기 버튼을 누른 다음 물건을 1층 교무실로 가져다 주세요.
             </p>
           </div>
@@ -113,13 +113,13 @@ export function ReportPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 maxLength={100}
-                placeholder="예: 검은색 애플워치"
+                placeholder="예: 검은색 에어팟 케이스"
                 className="h-12 w-full rounded bg-surface px-4 font-body-md text-body-md text-on-surface shadow-sm transition-shadow placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </Field>
 
             <Field label="카테고리" required error={errors.category}>
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
                 {CATEGORIES.map((c) => {
                   const active = category === c.id
                   return (
@@ -128,13 +128,14 @@ export function ReportPage() {
                       type="button"
                       aria-pressed={active}
                       onClick={() => setCategory(c.id)}
-                      className={`rounded-full px-4 py-2 font-label-md text-label-md shadow-sm transition-transform active:scale-95 ${
+                      className={`flex flex-col items-center justify-center gap-1 rounded-md px-1 py-3 font-label-sm text-label-sm transition-all active:scale-95 ${
                         active
-                          ? 'bg-primary-container text-on-primary-container'
-                          : 'bg-surface text-on-surface-variant hover:bg-surface-container-highest'
+                          ? 'bg-primary text-on-primary shadow-level1'
+                          : 'bg-surface text-on-surface-variant outline outline-1 outline-outline-variant/40 hover:bg-surface-container'
                       }`}
                     >
-                      {c.label}
+                      <Icon name={c.icon} size={22} filled={active} />
+                      <span className="break-keep text-center">{c.label}</span>
                     </button>
                   )
                 })}
@@ -150,7 +151,7 @@ export function ReportPage() {
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
                   maxLength={200}
-                  placeholder="예: 중앙도서관 2층 열람실"
+                  placeholder="예: 본관 3층 2학년 4반 앞 복도"
                   className="h-full w-full rounded-r bg-transparent px-2 font-body-md text-body-md text-on-surface placeholder:text-outline focus:outline-none"
                 />
               </div>
@@ -230,13 +231,13 @@ export function ReportPage() {
             </button>
           </div>
 
-          <div className="mb-6 flex items-start gap-4 rounded-lg bg-secondary-container p-4 shadow-level1">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-on-secondary-container text-secondary-container">
+          <div className="mb-6 flex items-start gap-4 rounded-lg bg-surface-container-low p-4">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-tertiary-fixed text-on-tertiary-fixed-variant">
               <Icon name="lightbulb" size={20} />
             </span>
             <div className="flex flex-col gap-1">
-              <h3 className="font-label-md text-label-md text-on-secondary-container">신고 팁</h3>
-              <p className="font-body-md text-body-md text-on-secondary-container/80">
+              <h3 className="font-label-md text-label-md text-on-surface">신고 팁</h3>
+              <p className="break-keep font-body-md text-body-md text-on-surface-variant">
                 정확한 장소와 물건의 특징을 잘 보여주는 사진은 주인을 찾는 데 결정적인 역할을 합니다.
               </p>
             </div>

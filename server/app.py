@@ -67,7 +67,10 @@ COOKIE_SECURE = IS_PRODUCTION or COOKIE_SAMESITE == "None"
 # The frontend shrinks photos to ~300KB before upload; this cap keeps the free
 # database tier (Neon: 0.5GB) from being eaten by a few uncompressed originals.
 MAX_PHOTO_BYTES = 3 * 1024 * 1024
-ALLOWED_CATEGORIES = {"electronics", "clothing", "wallet", "books", "etc"}
+ALLOWED_CATEGORIES = {
+    "electronics", "stationery", "books", "clothing", "wallet",
+    "bottle", "umbrella", "bag", "accessory", "etc",
+}
 DEFAULT_STORAGE_LOCATION = "1층 교무실"
 MAX_INQUIRY_LENGTH = 1000
 MAX_INQUIRIES_PER_HOUR = 5

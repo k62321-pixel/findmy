@@ -19,7 +19,7 @@ export function MyItemsPage() {
   const visible = tab === 'reported' ? reported : claimed
 
   return (
-    <AppShell title="My Items">
+    <AppShell title="내 물건">
       <section className="flex flex-col gap-6 px-margin-mobile py-8 md:px-margin-desktop">
         <div className="flex flex-col gap-2">
           <h2 className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">내 물건</h2>

@@ -33,7 +33,7 @@ export function AdminPage() {
   const visible = items.filter((it) => it.status === tab).sort(byNewestFirst)
 
   return (
-    <AppShell title="Admin">
+    <AppShell title="관리자">
       <section className="flex flex-col gap-6 px-margin-mobile py-8 md:px-margin-desktop">
         <div className="flex flex-col gap-2">
           <h2 className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">분실물 관리</h2>
@@ -42,14 +42,14 @@ export function AdminPage() {
           </p>
         </div>
 
-        <div className="flex gap-2 rounded-full bg-surface-container p-1">
+        <div className="flex gap-1 rounded-full bg-surface-container p-1">
           {TABS.map((t) => (
             <button
               key={t.id}
               type="button"
               aria-pressed={tab === t.id}
               onClick={() => setTab(t.id)}
-              className={`flex-1 rounded-full px-3 py-2 font-label-md text-label-md transition-all ${
+              className={`flex-1 whitespace-nowrap rounded-full px-1 py-2 font-label-sm text-label-sm transition-all sm:px-3 sm:text-label-md ${
                 tab === t.id
                   ? 'bg-surface-container-lowest text-primary shadow-sm'
                   : 'text-on-surface-variant hover:text-on-surface'
@@ -62,7 +62,7 @@ export function AdminPage() {
             type="button"
             aria-pressed={tab === 'inquiries'}
             onClick={() => setTab('inquiries')}
-            className={`flex-1 rounded-full px-3 py-2 font-label-md text-label-md transition-all ${
+            className={`flex-1 whitespace-nowrap rounded-full px-1 py-2 font-label-sm text-label-sm transition-all sm:px-3 sm:text-label-md ${
               tab === 'inquiries'
                 ? 'bg-surface-container-lowest text-primary shadow-sm'
                 : 'text-on-surface-variant hover:text-on-surface'

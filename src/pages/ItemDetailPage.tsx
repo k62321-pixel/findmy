@@ -29,13 +29,13 @@ export function ItemDetailPage() {
   if (!item) {
     if (itemsStatus === 'loading') {
       return (
-        <AppShell title="Item Details" back headerActions={false} nav={false}>
+        <AppShell title="물품 상세" back headerActions={false} nav={false}>
           <LoadingSpinner className="h-[60vh]" />
         </AppShell>
       )
     }
     return (
-      <AppShell title="Item Details" back nav={false}>
+      <AppShell title="물품 상세" back nav={false}>
         <div className="px-margin-mobile py-12">
           {itemsStatus === 'error' ? (
             <LoadError />
@@ -81,9 +81,9 @@ export function ItemDetailPage() {
   }
 
   return (
-    <AppShell title="Item Details" back headerActions={false} nav={false}>
+    <AppShell title="물품 상세" back headerActions={false} nav={false}>
       <div className="relative flex w-full flex-col">
-        <div className="relative h-[320px] w-full sm:h-[400px]">
+        <div className="relative h-[320px] w-full bg-surface-container sm:h-[400px]">
           <ItemThumb
             src={item.imageUrl}
             alt={item.name}
@@ -103,9 +103,9 @@ export function ItemDetailPage() {
               </span>
             </button>
           ) : null}
-          <div className="absolute bottom-margin-mobile left-margin-mobile flex gap-2">
+          <div className="pointer-events-none absolute bottom-10 left-margin-mobile flex gap-2">
             <StatusChip status={item.status} size="md" />
-            <span className="rounded-full bg-surface-container-highest px-3 py-1 font-label-md text-label-md text-on-surface shadow-sm">
+            <span className="rounded-full bg-surface-container-lowest/90 px-3 py-1 font-label-md text-label-md text-on-surface shadow-sm backdrop-blur">
               {categoryOf(item.category).label}
             </span>
           </div>
