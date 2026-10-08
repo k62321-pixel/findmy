@@ -43,15 +43,15 @@ export function AppHeader({ title, back = false, actions = true }: AppHeaderProp
           ) : (
             <BrandMark />
           )}
-          <h1 className="line-clamp-2 break-keep font-headline-md text-[15px] leading-tight text-primary sm:text-headline-md">{title}</h1>
+          <h1 className="truncate font-headline-md text-lg text-primary sm:text-headline-md">{title}</h1>
         </div>
 
         {actions ? (
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             <button
               type="button"
               onClick={openInquiry}
-              className="flex h-9 shrink-0 items-center gap-1 rounded-full px-3 font-label-sm text-label-sm text-on-surface-variant outline outline-1 outline-outline-variant transition-colors hover:bg-surface-variant"
+              className="flex h-9 shrink-0 items-center gap-1 rounded-full px-2.5 font-label-sm text-label-sm text-on-surface-variant outline outline-1 outline-outline-variant transition-colors hover:bg-surface-variant"
             >
               <Icon name="support_agent" size={18} />
               문의사항
@@ -77,9 +77,11 @@ export function AppHeader({ title, back = false, actions = true }: AppHeaderProp
                 <button
                   type="button"
                   onClick={() => logout()}
-                  className="font-label-sm text-label-sm text-on-surface-variant transition-colors hover:text-on-surface"
+                  aria-label="로그아웃"
+                  className="flex items-center font-label-sm text-label-sm text-on-surface-variant transition-colors hover:text-on-surface"
                 >
-                  로그아웃
+                  <Icon name="logout" size={20} className="sm:hidden" />
+                  <span className="hidden sm:inline">로그아웃</span>
                 </button>
               </div>
             ) : (

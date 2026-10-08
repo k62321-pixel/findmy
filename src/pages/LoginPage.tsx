@@ -38,7 +38,7 @@ export function LoginPage() {
         <img src="/image-removebg-preview(2).png" alt="경북일고 교표" className="h-24 w-24 object-contain" />
 
         <div className="flex flex-col gap-2">
-          <span className="font-label-md text-label-md text-primary">경북일고 분실물 신고 &amp; 찾기</span>
+          <span className="font-label-md text-label-md text-primary">경북일고 분실물</span>
           <h1 className="font-headline-xl text-headline-xl text-on-surface">로그인</h1>
           <p className="break-keep font-body-md text-body-md text-on-surface-variant">
             학교 계정(Google)으로 로그인하면 분실물을 신고하고 수령을 신청할 수 있습니다.
