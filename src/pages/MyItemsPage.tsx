@@ -47,7 +47,7 @@ export function MyItemsPage() {
             visible.map((item) => <ItemRow key={item.id} item={item} />)
           ) : (
             <EmptyState
-              imageSrc="/image-removebg-preview%20(2).png"
+              imageSrc="/image-removebg-preview(2).png"
               title={tab === 'reported' ? '신고한 습득물이 없습니다' : '수령 신청한 물건이 없습니다'}
               description={
                 tab === 'reported'
