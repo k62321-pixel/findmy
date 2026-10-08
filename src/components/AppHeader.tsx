@@ -100,13 +100,14 @@ export function AppHeader({ title, back = false, actions = true }: AppHeaderProp
   )
 }
 
+/** School crest; absolute path so it resolves on nested routes like /items/:id. */
 function BrandMark() {
   return (
-    <span
+    <img
+      src="/image-removebg-preview(2).png"
+      alt=""
       aria-hidden="true"
-      className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-primary text-on-primary"
-    >
-      <Icon name="school" size={20} filled />
-    </span>
+      className="h-9 w-9 shrink-0 object-contain"
+    />
   )
 }
