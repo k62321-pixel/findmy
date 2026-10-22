@@ -3,9 +3,8 @@ import { Icon } from './Icon'
 import { useAuth } from '../store/AuthProvider'
 
 const TABS = [
-  { to: '/', label: '홈', icon: 'home', end: true },
-  { to: '/report', label: '신고하기', icon: 'add_circle', end: false },
   { to: '/browse', label: '찾기', icon: 'search', end: false },
+  { to: '/report', label: '신고하기', icon: 'add_circle', end: false },
   { to: '/my-items', label: '내 물건', icon: 'inventory_2', end: false },
 ]
 
