@@ -13,6 +13,12 @@ import { useItems } from '../store/ItemsProvider'
 import { SITE_TITLE } from '../lib/site'
 import type { CategoryId } from '../types'
 
+const STEPS = [
+  { icon: 'edit_note', title: '신고하기', body: '주운 물건의 사진과 장소를 등록해요.' },
+  { icon: 'meeting_room', title: '교무실에 맡기기', body: '물건을 1층 교무실로 가져다주세요.' },
+  { icon: 'handshake', title: '주인 찾기', body: '주인은 ‘내 물건 찾기’ 후 교무실에서 받아요.' },
+]
+
 export function BrowsePage() {
   const { items, status } = useItems()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -28,13 +34,25 @@ export function BrowsePage() {
   return (
     <AppShell title={SITE_TITLE}>
       <section className="flex flex-col gap-4 px-margin-mobile pb-2 pt-4 md:px-margin-desktop">
-        <div className="flex items-start gap-3 rounded-md bg-surface-container-low p-3">
-          <Icon name="info" size={20} className="mt-0.5 shrink-0 text-primary" />
-          <p className="break-keep font-body-md text-body-md text-on-surface-variant">
-            신고된 물건 중 자신의 물건이 있다면 해당 게시물을 클릭하여 '내 물건 찾기'를 누르고, 1층 교무실로 물건을
-            찾으러 가세요.
-          </p>
-        </div>
+        <ol className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {STEPS.map((step, i) => (
+            <li
+              key={step.title}
+              className="flex items-start gap-3 rounded-lg bg-surface-container-low p-4 sm:flex-col sm:items-center sm:text-center"
+            >
+              <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-fixed text-primary">
+                <Icon name={step.icon} size={22} />
+                <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary font-label-sm text-[11px] text-on-primary">
+                  {i + 1}
+                </span>
+              </span>
+              <div className="flex flex-col gap-0.5">
+                <span className="font-label-md text-label-md text-on-surface">{step.title}</span>
+                <span className="break-keep font-label-sm text-label-sm text-on-surface-variant">{step.body}</span>
+              </div>
+            </li>
+          ))}
+        </ol>
 
         <SearchField value={query} onChange={setQuery} />
 

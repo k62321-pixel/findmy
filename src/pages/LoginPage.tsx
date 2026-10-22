@@ -17,7 +17,7 @@ export function LoginPage() {
 
   const from = (location.state as LocationState | null)?.from
   // Only same-app paths: never bounce to /login again or to anything off-site.
-  const redirectTo = from?.pathname?.startsWith('/') && from.pathname !== '/login' ? `${from.pathname}${from.search ?? ''}` : '/'
+  const redirectTo = from?.pathname?.startsWith('/') && from.pathname !== '/login' ? `${from.pathname}${from.search ?? ''}` : '/browse'
 
   async function handleSuccess(credentialResponse: CredentialResponse) {
     if (!credentialResponse.credential) {

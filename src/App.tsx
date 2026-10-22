@@ -1,6 +1,5 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { useEffect } from 'react'
-import { HomePage } from './pages/HomePage'
 import { BrowsePage } from './pages/BrowsePage'
 import { ItemDetailPage } from './pages/ItemDetailPage'
 import { ReportPage } from './pages/ReportPage'
@@ -23,7 +22,7 @@ export default function App() {
     <>
       <ScrollToTop />
       <Routes>
-        <Route path="/" element={<HomePage />} />
+        <Route path="/" element={<Navigate to="/browse" replace />} />
         <Route path="/browse" element={<BrowsePage />} />
         <Route path="/items/:id" element={<ItemDetailPage />} />
         <Route
@@ -51,7 +50,7 @@ export default function App() {
           }
         />
         <Route path="/login" element={<LoginPage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/browse" replace />} />
       </Routes>
     </>
   )

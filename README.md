@@ -38,7 +38,7 @@ Flask는 기본적으로 `127.0.0.1`에만 열리고 디버그 모드도 꺼져 
 
 | 경로 | 화면 | 원본 목업 |
 | --- | --- | --- |
-| `/` | 홈 — 히어로, 등록/찾기 버튼, 검색, 최근 습득물 그리드 | `_1` |
+| `/` | `/browse`로 바로 이동 | — |
 | `/browse` | 목록 — 검색, 카테고리 칩 필터, 습득물 리스트 | `_2` |
 | `/items/:id` | 상세 — 사진, 상태/카테고리 칩, 습득 정보, 수령 신청, (관리자) 관리 패널 | `_3` |
 | `/report` | 신고 — 물품명·카테고리·장소·사진·추가 정보 폼 | `_4` |
@@ -53,7 +53,7 @@ src/
   components/   AppShell, AppHeader, BottomNav, ItemCard, ItemRow,
                 SearchField, CategoryFilter, StatusChip, ItemThumb,
                 ClaimDialog, EmptyState, LoadError, Icon, ProtectedRoute
-  pages/        Home, Browse, ItemDetail, Report, MyItems, Admin, Login
+  pages/        Browse, ItemDetail, Report, MyItems, Admin, Login
   store/        AuthProvider — 로그인 상태(/api/me, /api/auth/google, /api/logout)
                 ItemsProvider — 습득물 목록 상태 + 신고/수령 신청/관리자 액션
   lib/          categories, format(날짜 표기), filter(검색·정렬), api(백엔드 URL·오류 메시지), image(업로드 전 사진 압축)

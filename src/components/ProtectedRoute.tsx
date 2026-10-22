@@ -13,6 +13,6 @@ export function ProtectedRoute({ children, admin = false }: { children: ReactNod
 
   if (status === 'loading') return null
   if (!user) return <Navigate to="/login" replace state={{ from: location }} />
-  if (admin && !user.isAdmin) return <Navigate to="/" replace />
+  if (admin && !user.isAdmin) return <Navigate to="/browse" replace />
   return <>{children}</>
 }
