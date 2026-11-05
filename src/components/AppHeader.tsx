@@ -67,10 +67,8 @@ export function AppHeader({ title, back = false, actions = true }: AppHeaderProp
 
         {actions ? (
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-            {/* Icon-only on phones so the school name keeps its room. */}
-            <button type="button" onClick={openInquiry} aria-label="문의사항" className={`${HEADER_BUTTON} max-sm:w-9 max-sm:justify-center max-sm:px-0`}>
-              <Icon name="support_agent" size={20} className="sm:hidden" />
-              <span className="hidden sm:inline">문의사항</span>
+            <button type="button" onClick={openInquiry} className={HEADER_BUTTON}>
+              문의사항
             </button>
 
             {user ? (
