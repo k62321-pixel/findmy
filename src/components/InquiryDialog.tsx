@@ -61,10 +61,6 @@ export function InquiryDialog({ onClose }: InquiryDialogProps) {
         onClick={(e) => e.stopPropagation()}
         className="flex w-full max-w-md flex-col gap-4 rounded-xl bg-surface-container-lowest p-6 shadow-level2"
       >
-        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary-container text-on-secondary-container">
-          <Icon name={sent ? 'check_circle' : 'support_agent'} />
-        </span>
-
         {sent ? (
           <>
             <div className="flex flex-col gap-1">
