@@ -158,9 +158,6 @@ function ProfileMenu({
           <Link to="/my-items" onClick={() => setOpen(false)} className={item}>
             <Icon name="inventory_2" size={20} className="text-outline" />내 물건
           </Link>
-          <Link to="/saved" onClick={() => setOpen(false)} className={item}>
-            <Icon name="favorite" size={20} className="text-outline" />찜한 물건
-          </Link>
           <Link to="/chats" onClick={() => setOpen(false)} className={item}>
             <Icon name="forum" size={20} className="text-outline" />채팅
           </Link>

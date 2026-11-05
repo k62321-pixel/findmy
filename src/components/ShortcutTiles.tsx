@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { Icon } from './Icon'
 import { isToday, matchKeywords } from '../lib/matching'
-import { useAlertsSeenAt, useKeywords, useRecentlyViewed, useSavedItems } from '../lib/recent'
+import { useAlertsSeenAt, useKeywords, useRecentlyViewed } from '../lib/recent'
 import { useItems } from '../store/ItemsProvider'
 
 const TILE_BOX =
@@ -14,7 +14,6 @@ const TILE = 'group flex w-full min-w-0 flex-col items-center gap-2'
 /** Shortcut row under the banner — each tile opens one of the finder tools. */
 export function ShortcutTiles() {
   const { items } = useItems()
-  const saved = useSavedItems()
   const recent = useRecentlyViewed()
   const keywords = useKeywords()
   const seenAt = useAlertsSeenAt()
@@ -26,9 +25,8 @@ export function ShortcutTiles() {
   ).length
   const todayCount = items.filter((it) => isToday(it.foundAt)).length
 
-  // `short` is what fits under a tile on a phone (six tiles share ~360px there).
+  // `short` is what fits under a tile on a phone (five tiles share ~360px there).
   const tiles = [
-    { label: '찜한 물건', short: '찜', icon: 'favorite', color: '#e8384f', to: '/saved', badge: 0, note: saved.length },
     { label: '최근 본 물건', short: '최근 본', icon: 'history', color: '#3b82f6', to: '/recent', badge: 0, note: recent.length },
     { label: '키워드 알림', short: '키워드', icon: 'notifications_active', color: '#f59e0b', to: '/alerts', badge: newMatches, note: 0 },
     { label: '오늘 들어온', short: '오늘', icon: 'today', color: '#16a34a', to: '/today', badge: 0, note: todayCount },
@@ -37,7 +35,7 @@ export function ShortcutTiles() {
 
   return (
     <>
-      <ul className="mx-auto grid w-full max-w-[720px] grid-cols-6 gap-x-2 md:gap-x-6">
+      <ul className="mx-auto grid w-full max-w-[620px] grid-cols-5 gap-x-3 md:gap-x-6">
         {tiles.map((tile) => (
           <li key={tile.label} style={{ color: tile.color }}>
             <Link to={tile.to} className={TILE}>

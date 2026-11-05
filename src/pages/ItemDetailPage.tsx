@@ -9,7 +9,7 @@ import { LoadError } from '../components/LoadError'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 import { categoryOf } from '../lib/categories'
 import { openChat } from '../lib/chat'
-import { addRecentlyViewed, toggleSaved, useSavedItems } from '../lib/recent'
+import { addRecentlyViewed } from '../lib/recent'
 import { formatFoundAt, formatFoundDate, formatRelative } from '../lib/format'
 import { useAuth } from '../store/AuthProvider'
 import { useItems } from '../store/ItemsProvider'
@@ -17,7 +17,8 @@ import type { LostItem } from '../types'
 
 export function ItemDetailPage() {
   const { id = '' } = useParams()
-  const { getItem, requestClaim, cancelClaim, status: itemsStatus } = useItems()
+  const { getItem, requestClaim, cancelClaim, setSaved, status: itemsStatus } = useItems()
+  const [savingToggle, setSavingToggle] = useState(false)
   const { user } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
@@ -28,7 +29,6 @@ export function ItemDetailPage() {
   const [openingChat, setOpeningChat] = useState(false)
   const item = getItem(id)
   const found = !!item
-  const savedIds = useSavedItems()
 
   useEffect(() => {
     if (found) addRecentlyViewed(id)
@@ -105,7 +105,23 @@ export function ItemDetailPage() {
     }
   }
 
-  const saved = savedIds.includes(item.id)
+  async function handleSaveClick() {
+    if (!user) {
+      navigate('/login', { state: { from: location } })
+      return
+    }
+    setSavingToggle(true)
+    setError('')
+    try {
+      await setSaved(item!.id, !item!.savedByMe)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '저장에 실패했습니다.')
+    } finally {
+      setSavingToggle(false)
+    }
+  }
+
+  const saved = !!item.savedByMe
 
   const actions = (
     <div className="flex flex-col gap-2">
@@ -118,13 +134,13 @@ export function ItemDetailPage() {
       <div className="flex gap-2">
         <button
           type="button"
-          onClick={() => toggleSaved(item.id)}
+          onClick={handleSaveClick}
+          disabled={savingToggle}
           aria-pressed={saved}
-          aria-label={saved ? '찜 해제' : '찜하기'}
-          className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded border border-outline-variant text-[11px] font-semibold text-on-surface-variant transition-colors hover:bg-surface-container-low"
+          aria-label={saved ? '저장 해제' : '저장하기'}
+          className="flex h-14 w-14 shrink-0 items-center justify-center rounded border border-outline-variant transition-colors hover:bg-surface-container-low disabled:opacity-60"
         >
-          <Icon name="favorite" size={24} filled={saved} className={saved ? 'text-primary' : 'text-outline'} />
-          찜
+          <Icon name="bookmark" size={26} filled={saved} className={saved ? 'text-on-surface' : 'text-outline'} />
         </button>
         {item.reportedByMe ? (
           <Link

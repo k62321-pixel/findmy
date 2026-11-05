@@ -8,7 +8,7 @@ import { LoginPage } from './pages/LoginPage'
 import { AdminPage } from './pages/AdminPage'
 import { ChatListPage } from './pages/ChatListPage'
 import { ChatRoomPage } from './pages/ChatRoomPage'
-import { AlertsPage, PlacesPage, RecentPage, SavedPage, TodayPage } from './pages/CollectionPages'
+import { AlertsPage, PlacesPage, RecentPage, TodayPage } from './pages/CollectionPages'
 import { ProtectedRoute } from './components/ProtectedRoute'
 
 /** Route changes should land at the top of the new screen, not mid-scroll. */
@@ -29,7 +29,6 @@ export default function App() {
         <Route path="/browse" element={<BrowsePage />} />
         <Route path="/items/:id" element={<ItemDetailPage />} />
         {/* Finder tools — stored per browser, so no sign-in needed. */}
-        <Route path="/saved" element={<SavedPage />} />
         <Route path="/recent" element={<RecentPage />} />
         <Route path="/alerts" element={<AlertsPage />} />
         <Route path="/today" element={<TodayPage />} />

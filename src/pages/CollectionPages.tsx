@@ -17,7 +17,6 @@ import {
   useAlertsSeenAt,
   useKeywords,
   useRecentlyViewed,
-  useSavedItems,
 } from '../lib/recent'
 import { useItems } from '../store/ItemsProvider'
 import type { LostItem } from '../types'
@@ -60,20 +59,6 @@ const browseLink = (
 function useItemsByIds(ids: string[]): LostItem[] {
   const { getItem } = useItems()
   return ids.map((id) => getItem(id)).filter((it): it is LostItem => it !== undefined)
-}
-
-export function SavedPage() {
-  const items = useItemsByIds(useSavedItems())
-  return (
-    <Frame title="찜한 물건" description="내 것 같은 물건을 ♥로 모아 두세요. 이 기기에만 저장됩니다.">
-      <Grid
-        items={items}
-        empty={
-          <EmptyState icon="favorite" title="찜한 물건이 없습니다" description="상세 화면의 ♥ 버튼을 눌러 보세요." action={browseLink} />
-        }
-      />
-    </Frame>
-  )
 }
 
 export function RecentPage() {

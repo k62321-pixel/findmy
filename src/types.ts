@@ -44,6 +44,8 @@ export interface LostItem {
   reportedByMe?: boolean
   /** True when the signed-in user is the one who requested pickup. */
   claimedByMe?: boolean
+  /** True when the signed-in user bookmarked it (저장). Stored per account on the server. */
+  savedByMe?: boolean
   admin?: ItemAdminInfo
 }
 

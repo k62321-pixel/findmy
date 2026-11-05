@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 
 /**
- * Small per-browser lists kept in localStorage — 최근 본 물건, 찜, 키워드 알림.
+ * Small per-browser lists kept in localStorage — 최근 본 물건, 키워드 알림.
  * They're personal conveniences, so nothing goes to the server; every access is
  * wrapped because storage can be blocked (private mode, site-data settings).
  */
@@ -61,19 +61,6 @@ export function addRecentlyViewed(id: string) {
 
 export function useRecentlyViewed(): string[] {
   return useStored(RECENT_KEY, [], stringList)
-}
-
-// --- 찜 ---------------------------------------------------------------------
-
-const SAVED_KEY = 'saved-items'
-
-export function toggleSaved(id: string) {
-  const prev = stringList(readJson(SAVED_KEY, []))
-  writeJson(SAVED_KEY, prev.includes(id) ? prev.filter((v) => v !== id) : [id, ...prev].slice(0, 100))
-}
-
-export function useSavedItems(): string[] {
-  return useStored(SAVED_KEY, [], stringList)
 }
 
 // --- 키워드 알림 --------------------------------------------------------------

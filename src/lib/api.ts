@@ -35,6 +35,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   not_claimant: '내가 신청한 건만 취소할 수 있습니다.',
   invalid_status: '잘못된 상태 값입니다.',
   inquiry_rate_limited: '문의는 1시간에 5건까지 보낼 수 있습니다. 잠시 후 다시 시도해 주세요.',
+  too_many_saved: '저장은 200개까지 할 수 있습니다. 필요 없는 물건은 저장을 해제해 주세요.',
   own_item_chat: '내가 신고한 물건에는 채팅을 시작할 수 없습니다.',
   chat_not_found: '존재하지 않거나 볼 수 없는 채팅방입니다.',
   chat_closed: '반환이 끝난 물건이라 더 이상 메시지를 보낼 수 없습니다.',

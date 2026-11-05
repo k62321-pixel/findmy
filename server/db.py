@@ -156,6 +156,17 @@ def init_db(storage_location: str) -> None:
             )
             """
         )
+        # 저장한 물건 — per account, so a save on the phone shows up on the PC too.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS saved_items (
+                user_sub TEXT NOT NULL,
+                item_id TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                PRIMARY KEY (user_sub, item_id)
+            )
+            """
+        )
         conn.execute("CREATE INDEX IF NOT EXISTS idx_chats_asker ON chats(asker_sub)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_chats_item ON chats(item_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_chat_messages_chat ON chat_messages(chat_id, created_at)")

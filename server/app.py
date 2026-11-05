@@ -269,8 +269,24 @@ def _now():
     return datetime.now(timezone.utc).isoformat()
 
 
-def _serialize_item(row, user):
+def _saved_ids(user, item_id=None):
+    """Item ids the user has saved — all of them, or just whether `item_id` is one."""
+    if not user:
+        return set()
+    with get_connection() as conn:
+        if item_id is None:
+            rows = conn.execute("SELECT item_id FROM saved_items WHERE user_sub = ?", (user["sub"],)).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT item_id FROM saved_items WHERE user_sub = ? AND item_id = ?", (user["sub"], item_id)
+            ).fetchall()
+    return {r["item_id"] for r in rows}
+
+
+def _serialize_item(row, user, saved_ids=None):
     current_sub = user["sub"] if user else None
+    if saved_ids is None:
+        saved_ids = _saved_ids(user, row["id"])
     item = {
         "id": row["id"],
         "name": row["name"],
@@ -284,6 +300,7 @@ def _serialize_item(row, user):
         "imageUrl": f"/api/uploads/{row['image_filename']}" if row["image_filename"] else None,
         "reportedByMe": bool(current_sub) and row["reporter_sub"] == current_sub,
         "claimedByMe": bool(current_sub) and row["claimant_sub"] == current_sub,
+        "savedByMe": row["id"] in saved_ids,
     }
     # Personal details of reporters/claimants are for the lost & found staff only.
     if _is_admin(user):
@@ -338,7 +355,8 @@ def list_items():
         else:
             rows = conn.execute("SELECT * FROM items ORDER BY created_at DESC").fetchall()
 
-    return jsonify(items=[_serialize_item(row, user) for row in rows])
+    saved = _saved_ids(user)  # one query for the whole list
+    return jsonify(items=[_serialize_item(row, user, saved) for row in rows])
 
 
 @app.get("/api/items/<item_id>")
@@ -519,6 +537,38 @@ def set_item_status(user, item_id):
     return jsonify(item=_serialize_item(row, user))
 
 
+MAX_SAVED_ITEMS = 200
+
+
+@app.post("/api/items/<item_id>/save")
+@login_required
+def save_item(user, item_id):
+    with get_connection() as conn:
+        if not _fetch_item(conn, item_id):
+            return jsonify(error="not_found"), 404
+        count = conn.execute("SELECT COUNT(*) AS n FROM saved_items WHERE user_sub = ?", (user["sub"],)).fetchone()["n"]
+        if count >= MAX_SAVED_ITEMS:
+            return jsonify(error="too_many_saved"), 429
+        conn.execute(
+            "INSERT INTO saved_items (user_sub, item_id, created_at) VALUES (?, ?, ?) ON CONFLICT (user_sub, item_id) DO NOTHING",
+            (user["sub"], item_id, _now()),
+        )
+        row = _fetch_item(conn, item_id)
+    # Serialized after the commit so the saved-check sees the new row.
+    return jsonify(item=_serialize_item(row, user))
+
+
+@app.post("/api/items/<item_id>/unsave")
+@login_required
+def unsave_item(user, item_id):
+    with get_connection() as conn:
+        row = _fetch_item(conn, item_id)
+        if not row:
+            return jsonify(error="not_found"), 404
+        conn.execute("DELETE FROM saved_items WHERE user_sub = ? AND item_id = ?", (user["sub"], item_id))
+    return jsonify(item=_serialize_item(row, user))
+
+
 @app.delete("/api/items/<item_id>")
 @admin_required
 def delete_item(user, item_id):
@@ -532,6 +582,7 @@ def delete_item(user, item_id):
             (item_id,),
         )
         conn.execute("DELETE FROM chats WHERE item_id = ?", (item_id,))
+        conn.execute("DELETE FROM saved_items WHERE item_id = ?", (item_id,))
         if row["image_filename"]:
             conn.execute("DELETE FROM images WHERE filename = ?", (row["image_filename"],))
 

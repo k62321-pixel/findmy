@@ -26,6 +26,8 @@ interface ItemsContextValue {
   cancelClaim: (id: string) => Promise<LostItem>
   /** Admin only: confirm a handover ('returned') or reject/undo it ('stored'). */
   setItemStatus: (id: string, status: 'stored' | 'returned') => Promise<LostItem>
+  /** Signed-in user bookmarks (저장) or un-bookmarks an item. */
+  setSaved: (id: string, save: boolean) => Promise<LostItem>
   /** Admin only. */
   deleteItem: (id: string) => Promise<void>
 }
@@ -123,6 +125,12 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
     [itemAction],
   )
 
+  const setSaved = useCallback(
+    (id: string, save: boolean) =>
+      itemAction(`/api/items/${id}/${save ? 'save' : 'unsave'}`, '저장에 실패했습니다.'),
+    [itemAction],
+  )
+
   const deleteItem = useCallback(async (id: string) => {
     const res = await fetch(apiUrl(`/api/items/${id}`), { method: 'DELETE', credentials: 'include' })
     if (!res.ok) throw await responseError(res, '삭제에 실패했습니다.')
@@ -130,8 +138,8 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const value = useMemo(
-    () => ({ items, status, refresh, getItem, addItem, requestClaim, cancelClaim, setItemStatus, deleteItem }),
-    [items, status, refresh, getItem, addItem, requestClaim, cancelClaim, setItemStatus, deleteItem],
+    () => ({ items, status, refresh, getItem, addItem, requestClaim, cancelClaim, setItemStatus, setSaved, deleteItem }),
+    [items, status, refresh, getItem, addItem, requestClaim, cancelClaim, setItemStatus, setSaved, deleteItem],
   )
 
   return <ItemsContext.Provider value={value}>{children}</ItemsContext.Provider>
