@@ -7,10 +7,10 @@ import { Icon } from '../components/Icon'
 import { ItemThumb } from '../components/ItemThumb'
 import { LoadError } from '../components/LoadError'
 import { LoadingSpinner } from '../components/LoadingSpinner'
-import { StatusChip } from '../components/StatusChip'
 import { categoryOf } from '../lib/categories'
 import { openChat } from '../lib/chat'
-import { formatFoundAt, formatFoundDate } from '../lib/format'
+import { addRecentlyViewed } from '../lib/recent'
+import { formatFoundAt, formatFoundDate, formatRelative } from '../lib/format'
 import { useAuth } from '../store/AuthProvider'
 import { useItems } from '../store/ItemsProvider'
 import type { LostItem } from '../types'
@@ -27,6 +27,11 @@ export function ItemDetailPage() {
   const [viewingPhoto, setViewingPhoto] = useState(false)
   const [openingChat, setOpeningChat] = useState(false)
   const item = getItem(id)
+  const found = !!item
+
+  useEffect(() => {
+    if (found) addRecentlyViewed(id)
+  }, [found, id])
 
   if (!item) {
     if (itemsStatus === 'loading') {
@@ -99,117 +104,142 @@ export function ItemDetailPage() {
     }
   }
 
+  const actions = (
+    <div className="flex flex-col gap-2">
+      {error && !claiming ? (
+        <p role="alert" className="flex items-center gap-1 font-label-sm text-label-sm text-error">
+          <Icon name="error" size={14} />
+          {error}
+        </p>
+      ) : null}
+      <div className="flex gap-2">
+        {item.reportedByMe ? (
+          <Link
+            to="/chats"
+            className="flex h-14 flex-1 items-center justify-center gap-1.5 rounded bg-inverse-surface text-[16px] font-bold text-inverse-on-surface"
+          >
+            <Icon name="forum" />
+            받은 채팅 보기
+          </Link>
+        ) : item.status !== 'returned' ? (
+          <button
+            type="button"
+            onClick={handleChatClick}
+            disabled={openingChat}
+            className="flex h-14 flex-1 items-center justify-center gap-1.5 rounded bg-inverse-surface text-[16px] font-bold text-inverse-on-surface transition-opacity disabled:opacity-60"
+          >
+            <Icon name="chat" />
+            습득자와 채팅
+          </button>
+        ) : null}
+        <div className="min-w-0 flex-1">
+          <PrimaryAction
+            item={item}
+            submitting={submitting}
+            onClaim={handleClaimClick}
+            onCancel={() => run(() => cancelClaim(item.id))}
+          />
+        </div>
+      </div>
+    </div>
+  )
+
   return (
     <AppShell title="물품 상세" back headerActions={false} nav={false}>
-      <div className="relative flex w-full flex-col">
-        <div className="relative h-[320px] w-full bg-surface-container sm:h-[400px]">
-          <ItemThumb
-            src={item.imageUrl}
-            alt={item.name}
-            category={item.category}
-            className={`h-full w-full ${returned ? 'grayscale' : ''}`}
-            glyphSize={96}
-          />
-          {item.imageUrl ? (
-            <button
-              type="button"
-              onClick={() => setViewingPhoto(true)}
-              aria-label="사진 크게 보기"
-              className="absolute inset-0 cursor-zoom-in"
-            >
-              <span className="absolute right-margin-mobile top-margin-mobile flex h-10 w-10 items-center justify-center rounded-full bg-inverse-surface/50 text-inverse-on-surface">
-                <Icon name="fullscreen" />
-              </span>
-            </button>
-          ) : null}
-          <div className="pointer-events-none absolute bottom-10 left-margin-mobile flex gap-2">
-            <StatusChip status={item.status} size="md" />
-            <span className="rounded-full bg-surface-container-lowest/90 px-3 py-1 font-label-md text-label-md text-on-surface shadow-sm backdrop-blur">
-              {categoryOf(item.category).label}
-            </span>
-          </div>
-        </div>
+      {/* Marketplace product layout: breadcrumb, then photo left / details right on wide screens. */}
+      <div className="flex flex-col gap-4 px-margin-mobile pb-40 pt-4 md:px-margin-desktop md:pb-16 md:pt-6">
+        <nav aria-label="경로" className="flex items-center gap-1 text-[13px] text-outline md:text-[14px]">
+          <Link to="/browse" className="hover:text-on-surface">
+            습득물
+          </Link>
+          <Icon name="chevron_right" size={16} />
+          <span className="font-semibold text-on-surface">{categoryOf(item.category).label}</span>
+        </nav>
 
-        <div className="relative z-10 -mt-6 flex flex-col gap-6 rounded-t-xl bg-surface px-margin-mobile pb-48 pt-6 shadow-[0_-4px_24px_rgba(0,0,0,0.05)] md:px-margin-desktop">
-          <div className="flex flex-col gap-1">
-            <h2 className="break-words font-headline-lg-mobile text-headline-lg-mobile text-on-surface">{item.name}</h2>
-            {item.description ? (
-              <p className="whitespace-pre-line break-words font-body-md text-body-md text-on-surface-variant">
-                {item.description}
-              </p>
-            ) : null}
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Fact icon="calendar_today" label="습득일" value={formatFoundDate(item.foundAt)} />
-            <Fact icon="location_on" label="습득 장소" value={item.location} />
-          </div>
-
-          <div className="flex items-start gap-4 rounded-md bg-surface-container p-4">
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary-container text-on-primary-container">
-              <Icon name="account_balance" size={24} filled />
-            </span>
-            <div className="flex flex-col gap-1">
-              <h3 className="font-label-md text-label-md text-on-surface">현재 보관 장소</h3>
-              <p className="font-body-md text-body-md text-on-surface-variant">{item.storage}</p>
-              <p className="mt-1 font-label-sm text-label-sm text-outline">운영 시간: 평일 09:00 - 17:00</p>
-            </div>
-          </div>
-
-          {item.claimedByMe && item.status === 'requested' ? (
-            <div className="flex items-start gap-3 rounded-md bg-tertiary-fixed p-4 text-on-tertiary-fixed">
-              <Icon name="schedule" size={20} className="mt-0.5 shrink-0" />
-              <p className="font-body-md text-body-md">
-                수령 신청이 접수되었습니다. {item.storage}에 학생증을 지참해 방문해 주세요. 담당자가 확인하면
-                반환완료로 바뀝니다.
-              </p>
-            </div>
-          ) : null}
-
-          {user?.isAdmin ? <AdminPanel item={item} /> : null}
-        </div>
-
-        <div className="fixed inset-x-0 bottom-0 z-20 bg-surface/90 p-4 pb-safe shadow-[0_-4px_16px_rgba(0,0,0,0.05)] backdrop-blur-md">
-          <div className="mx-auto flex max-w-container flex-col gap-2">
-            {error && !claiming ? (
-              <p role="alert" className="flex items-center gap-1 font-label-sm text-label-sm text-error">
-                <Icon name="error" size={14} />
-                {error}
-              </p>
-            ) : null}
-            <div className="flex gap-2">
-              <div className="min-w-0 flex-1">
-                <PrimaryAction
-                  item={item}
-                  signedIn={!!user}
-                  submitting={submitting}
-                  onClaim={handleClaimClick}
-                  onCancel={() => run(() => cancelClaim(item.id))}
-                />
+        <div className="flex flex-col gap-6 md:flex-row md:items-start md:gap-12">
+          <div className="relative aspect-square w-full shrink-0 overflow-hidden rounded-lg bg-surface-container md:w-[46%]">
+            <ItemThumb
+              src={item.imageUrl}
+              alt={item.name}
+              category={item.category}
+              className={`h-full w-full ${returned ? 'grayscale' : ''}`}
+              glyphSize={96}
+            />
+            {returned ? (
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/45">
+                <span className="text-[22px] font-bold text-white">반환완료</span>
               </div>
-              {item.reportedByMe ? (
-                <Link
-                  to="/chats"
-                  aria-label="이 물건에 온 채팅 보기"
-                  className="flex w-14 shrink-0 items-center justify-center rounded-md text-primary outline outline-1 outline-outline-variant transition-colors hover:bg-surface-container"
-                >
-                  <Icon name="forum" />
-                </Link>
-              ) : item.status !== 'returned' ? (
-                <button
-                  type="button"
-                  onClick={handleChatClick}
-                  disabled={openingChat}
-                  className="flex shrink-0 items-center justify-center gap-1 rounded-md px-4 font-label-md text-label-md text-primary outline outline-1 outline-outline-variant transition-colors hover:bg-surface-container disabled:opacity-60"
-                >
-                  <Icon name="chat" />
-                  <span className="hidden sm:inline">습득자와 채팅</span>
-                  <span className="sm:hidden">채팅</span>
-                </button>
-              ) : null}
-            </div>
+            ) : null}
+            {item.imageUrl ? (
+              <button
+                type="button"
+                onClick={() => setViewingPhoto(true)}
+                aria-label="사진 크게 보기"
+                className="absolute inset-0 cursor-zoom-in"
+              >
+                <span className="absolute bottom-3 right-3 flex h-9 w-9 items-center justify-center rounded-full bg-black/40 text-white">
+                  <Icon name="fullscreen" size={20} />
+                </span>
+              </button>
+            ) : null}
+          </div>
+
+          <div className="flex min-w-0 flex-1 flex-col">
+            <h2 className="break-words text-[20px] leading-7 text-on-surface md:text-[24px] md:leading-8">{item.name}</h2>
+            <p className={`mt-1 text-[26px] font-bold leading-9 md:text-[30px] ${STATUS_TONE[item.status]}`}>
+              {STATUS_LABEL[item.status]}
+            </p>
+            <p className="mt-2 flex items-center gap-1 text-[14px] text-outline">
+              <Icon name="schedule" size={16} />
+              {formatRelative(item.foundAt)} 등록
+            </p>
+
+            <dl className="mt-5 grid grid-cols-[84px_1fr] gap-y-3 border-t border-outline-variant pt-5 text-[15px] md:grid-cols-[96px_1fr]">
+              <dt className="text-outline">카테고리</dt>
+              <dd className="text-on-surface">{categoryOf(item.category).label}</dd>
+              <dt className="text-outline">습득 장소</dt>
+              <dd className="break-words text-on-surface">{item.location}</dd>
+              <dt className="text-outline">습득일</dt>
+              <dd className="text-on-surface">{formatFoundDate(item.foundAt)}</dd>
+              <dt className="text-outline">보관 장소</dt>
+              <dd className="text-on-surface">
+                {item.storage}
+                <span className="ml-1 text-[13px] text-outline">(평일 09:00 - 17:00)</span>
+              </dd>
+            </dl>
+
+            {item.description ? (
+              <div className="mt-6 border-t border-outline-variant pt-5">
+                <h3 className="mb-2 text-[16px] font-bold text-on-surface">물품 설명</h3>
+                <p className="whitespace-pre-line break-words text-[16px] leading-7 text-on-surface">{item.description}</p>
+              </div>
+            ) : null}
+
+            {item.claimedByMe && item.status === 'requested' ? (
+              <div className="mt-6 flex items-start gap-3 rounded bg-primary-container p-4 text-on-surface">
+                <Icon name="schedule" size={20} className="mt-0.5 shrink-0 text-primary" />
+                <p className="text-[15px] leading-6">
+                  수령 신청이 접수되었습니다. {item.storage}에 학생증을 지참해 방문해 주세요. 담당자가 확인하면
+                  반환완료로 바뀝니다.
+                </p>
+              </div>
+            ) : null}
+
+            {/* Wide screens: actions sit in the details column, like a product page's buy buttons. */}
+            <div className="mt-8 hidden md:block">{actions}</div>
+
+            {user?.isAdmin ? (
+              <div className="mt-8">
+                <AdminPanel item={item} />
+              </div>
+            ) : null}
           </div>
         </div>
+      </div>
+
+      {/* Narrow screens: the same actions pinned to the bottom. */}
+      <div className="fixed inset-x-0 bottom-0 z-20 bg-surface-container-lowest p-3 pb-safe shadow-bar-top md:hidden">
+        <div className="mx-auto max-w-container">{actions}</div>
       </div>
 
       {viewingPhoto && item.imageUrl ? (
@@ -229,18 +259,28 @@ export function ItemDetailPage() {
   )
 }
 
+const STATUS_LABEL: Record<LostItem['status'], string> = {
+  stored: '보관중',
+  requested: '수령 신청중',
+  returned: '반환완료',
+}
+
+const STATUS_TONE: Record<LostItem['status'], string> = {
+  stored: 'text-on-surface',
+  requested: 'text-primary',
+  returned: 'text-outline',
+}
+
 const BUTTON_BASE =
-  'flex w-full items-center justify-center gap-2 rounded-md py-4 font-label-md text-label-md transition-transform active:scale-[0.98] disabled:cursor-not-allowed'
+  'flex h-14 w-full items-center justify-center gap-1.5 rounded text-[16px] font-bold transition-transform active:scale-[0.98] disabled:cursor-not-allowed'
 
 function PrimaryAction({
   item,
-  signedIn,
   submitting,
   onClaim,
   onCancel,
 }: {
   item: LostItem
-  signedIn: boolean
   submitting: boolean
   onClaim: () => void
   onCancel: () => void
@@ -261,11 +301,11 @@ function PrimaryAction({
 
   const disabledReason =
     item.status === 'returned'
-      ? { icon: 'check_circle', label: '이미 반환된 물건입니다' }
+      ? { icon: 'check_circle', label: '반환완료' }
       : item.status === 'requested'
-        ? { icon: 'hourglass_top', label: '다른 사람이 수령 신청한 물건입니다' }
+        ? { icon: 'hourglass_top', label: '다른 사람이 신청함' }
         : item.reportedByMe
-          ? { icon: 'person', label: '내가 신고한 물건입니다' }
+          ? { icon: 'person', label: '내가 신고한 물건' }
           : null
 
   if (disabledReason) {
@@ -284,7 +324,8 @@ function PrimaryAction({
       className={`${BUTTON_BASE} bg-primary text-on-primary shadow-level1`}
     >
       <Icon name="handshake" />
-      {signedIn ? '내 물건 찾기' : '로그인하고 내 물건 찾기'}
+      {/* Signed-out users are sent to /login first by onClaim. */}
+      내 물건 찾기
     </button>
   )
 }
@@ -400,18 +441,6 @@ function AdminPanel({ item }: { item: LostItem }) {
         </p>
       ) : null}
     </section>
-  )
-}
-
-function Fact({ icon, label, value }: { icon: string; label: string; value: string }) {
-  return (
-    <div className="flex flex-col gap-2 rounded-md bg-surface-container-low p-4">
-      <div className="flex items-center gap-2 text-primary">
-        <Icon name={icon} size={20} filled />
-        <span className="font-label-md text-label-md">{label}</span>
-      </div>
-      <p className="break-words font-body-md text-body-md text-on-surface">{value}</p>
-    </div>
   )
 }
 

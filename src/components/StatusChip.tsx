@@ -16,6 +16,6 @@ interface StatusChipProps {
 
 export function StatusChip({ status, size = 'sm', className = '' }: StatusChipProps) {
   const { label, className: tone } = STYLES[status] ?? STYLES.stored
-  const scale = size === 'md' ? 'px-3 py-1 text-label-md font-label-md' : 'px-2 py-0.5 text-label-sm font-label-sm'
-  return <span className={`inline-block rounded-full shadow-sm ${scale} ${tone} ${className}`}>{label}</span>
+  const scale = size === 'md' ? 'px-2.5 py-1 text-label-md font-label-md' : 'px-1.5 py-0.5 text-label-sm font-label-sm'
+  return <span className={`inline-block rounded-sm ${scale} ${tone} ${className}`}>{label}</span>
 }

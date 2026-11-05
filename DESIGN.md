@@ -1,26 +1,26 @@
 ---
 name: Academic Continuity System
 colors:
-  surface: '#f8f9ff'
-  surface-dim: '#cbdbf5'
-  surface-bright: '#f8f9ff'
+  surface: '#ffffff'
+  surface-dim: '#e5e5e5'
+  surface-bright: '#ffffff'
   surface-container-lowest: '#ffffff'
-  surface-container-low: '#eff4ff'
-  surface-container: '#e5eeff'
-  surface-container-high: '#dce9ff'
-  surface-container-highest: '#d3e4fe'
-  on-surface: '#0b1c30'
-  on-surface-variant: '#444653'
-  inverse-surface: '#213145'
-  inverse-on-surface: '#eaf1ff'
-  outline: '#757684'
-  outline-variant: '#c4c5d5'
-  surface-tint: '#3755c3'
-  primary: '#00288e'
+  surface-container-low: '#f7f7f7'
+  surface-container: '#f2f2f2'
+  surface-container-high: '#eaeaea'
+  surface-container-highest: '#e2e2e2'
+  on-surface: '#1e1e1e'
+  on-surface-variant: '#5c5c5c'
+  inverse-surface: '#222222'
+  inverse-on-surface: '#f5f5f5'
+  outline: '#9b9b9b'
+  outline-variant: '#e5e5e5'
+  surface-tint: '#d80c18'
+  primary: '#d80c18'
   on-primary: '#ffffff'
-  primary-container: '#1e40af'
-  on-primary-container: '#a8b8ff'
-  inverse-primary: '#b8c4ff'
+  primary-container: '#fdecee'
+  on-primary-container: '#d80c18'
+  inverse-primary: '#ff8a90'
   secondary: '#006c4a'
   on-secondary: '#ffffff'
   secondary-container: '#82f5c1'
@@ -33,10 +33,10 @@ colors:
   on-error: '#ffffff'
   error-container: '#ffdad6'
   on-error-container: '#93000a'
-  primary-fixed: '#dde1ff'
-  primary-fixed-dim: '#b8c4ff'
-  on-primary-fixed: '#001453'
-  on-primary-fixed-variant: '#173bab'
+  primary-fixed: '#fdecee'
+  primary-fixed-dim: '#f8b9bd'
+  on-primary-fixed: '#5c0006'
+  on-primary-fixed-variant: '#a3000c'
   secondary-fixed: '#85f8c4'
   secondary-fixed-dim: '#68dba9'
   on-secondary-fixed: '#002114'
@@ -45,9 +45,9 @@ colors:
   tertiary-fixed-dim: '#ffb95f'
   on-tertiary-fixed: '#2a1700'
   on-tertiary-fixed-variant: '#653e00'
-  background: '#f8f9ff'
-  on-background: '#0b1c30'
-  surface-variant: '#d3e4fe'
+  background: '#ffffff'
+  on-background: '#1e1e1e'
+  surface-variant: '#eeeeee'
 typography:
   headline-xl:
     fontFamily: Pretendard
@@ -91,11 +91,11 @@ typography:
     fontWeight: '500'
     lineHeight: 16px
 rounded:
-  sm: 0.25rem
-  DEFAULT: 0.5rem
-  md: 0.75rem
-  lg: 1rem
-  xl: 1.5rem
+  sm: 2px
+  DEFAULT: 4px
+  md: 6px
+  lg: 8px
+  xl: 12px
   full: 9999px
 spacing:
   unit: 8px
@@ -105,6 +105,10 @@ spacing:
   margin-desktop: 48px
   section-gap: 64px
 ---
+
+> **2026-11 리디자인:** 마켓앱 스타일로 변경 — 흰 배경, 빨간 포인트(#d80c18), 그림자 대신 1px 회색 선,
+> 작은 모서리(4–8px), 2열(모바일)~5열 사진 격자 목록, 둥근 아이콘 카테고리 메뉴. 아래 본문 중 색·그림자·모서리
+> 설명은 이전 디자인 기준이며, 값은 위 프론트매터와 `tailwind.config.js`가 기준입니다.
 
 ## Brand & Style
 

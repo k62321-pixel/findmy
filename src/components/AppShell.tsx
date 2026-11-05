@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { AppHeader } from './AppHeader'
 import { BottomNav } from './BottomNav'
+import { RecentlyViewed } from './RecentlyViewed'
 
 interface AppShellProps {
   title: string
@@ -20,6 +21,7 @@ export function AppShell({ title, back = false, headerActions = true, nav = true
         <div className="mx-auto w-full max-w-container">{children}</div>
       </main>
       {nav ? <BottomNav /> : null}
+      <RecentlyViewed />
     </div>
   )
 }

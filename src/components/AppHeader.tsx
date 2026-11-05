@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Icon } from './Icon'
 import { InquiryDialog } from './InquiryDialog'
 import { useAuth } from '../store/AuthProvider'
@@ -12,6 +12,14 @@ interface AppHeaderProps {
   /** Inquiry button + account area on the right. */
   actions?: boolean
 }
+
+/** Bold wordmark with only slightly tightened spacing so Hangul doesn't look cramped. */
+const TITLE =
+  'truncate font-body-md text-[18px] font-extrabold leading-none tracking-[-0.02em] text-on-surface sm:text-[21px]'
+
+/** Plain bordered box with bold dark text — the marketplace-style header button. */
+const HEADER_BUTTON =
+  'flex h-9 shrink-0 items-center whitespace-nowrap rounded-md border border-outline-variant bg-surface-container-lowest px-3 text-[13px] font-bold text-on-surface transition-colors hover:bg-surface-container-low sm:h-11 sm:px-5 sm:text-[15px]'
 
 export function AppHeader({ title, back = false, actions = true }: AppHeaderProps) {
   const navigate = useNavigate()
@@ -40,20 +48,26 @@ export function AppHeader({ title, back = false, actions = true }: AppHeaderProp
             >
               <Icon name="arrow_back" />
             </button>
+          ) : null}
+          {back ? (
+            <h1 className={TITLE}>{title}</h1>
           ) : (
-            <BrandMark />
+            // Crest + name act as the home button: back to a fresh browse screen.
+            <Link
+              to="/browse"
+              state={{ home: Date.now() }}
+              aria-label="처음 화면으로"
+              className="flex min-w-0 items-center gap-unit"
+            >
+              <BrandMark />
+              <h1 className={TITLE}>{title}</h1>
+            </Link>
           )}
-          <h1 className="truncate font-display text-[20px] font-bold leading-none tracking-tight text-primary sm:text-[26px]">{title}</h1>
         </div>
 
         {actions ? (
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-            <button
-              type="button"
-              onClick={openInquiry}
-              className="flex h-9 shrink-0 items-center gap-1 rounded-full px-2.5 font-label-sm text-label-sm text-on-surface-variant outline outline-1 outline-outline-variant transition-colors hover:bg-surface-variant"
-            >
-              <Icon name="support_agent" size={18} />
+            <button type="button" onClick={openInquiry} className={HEADER_BUTTON}>
               문의사항
             </button>
 
@@ -74,23 +88,14 @@ export function AppHeader({ title, back = false, actions = true }: AppHeaderProp
                     {user.name.slice(0, 1)}
                   </div>
                 )}
-                <button
-                  type="button"
-                  onClick={() => logout()}
-                  aria-label="로그아웃"
-                  className="flex items-center font-label-sm text-label-sm text-on-surface-variant transition-colors hover:text-on-surface"
-                >
-                  <Icon name="logout" size={20} className="sm:hidden" />
-                  <span className="hidden sm:inline">로그아웃</span>
+                <button type="button" onClick={() => logout()} className={HEADER_BUTTON}>
+                  로그아웃
                 </button>
               </div>
             ) : (
-              <button
-                type="button"
-                onClick={() => navigate('/login')}
-                className="rounded-full bg-primary px-4 py-2 font-label-sm text-label-sm text-on-primary shadow-sm transition-transform active:scale-95"
-              >
-                로그인
+              <button type="button" onClick={() => navigate('/login')} className={HEADER_BUTTON}>
+                <span className="sm:hidden">로그인</span>
+                <span className="hidden sm:inline">로그인/회원가입</span>
               </button>
             )}
           </div>

@@ -18,10 +18,10 @@ export function SearchField({
   autoFocus = false,
 }: SearchFieldProps) {
   return (
-    <div className="group relative flex h-12 w-full items-center overflow-hidden rounded-full border border-outline-variant/30 bg-surface-container-lowest shadow-level1 transition-shadow focus-within:shadow-level1-hover">
+    <div className="group relative flex h-11 w-full items-center overflow-hidden rounded border border-transparent bg-surface-container transition-colors focus-within:border-primary focus-within:bg-surface-container-lowest">
       <Icon
         name="search"
-        className="absolute left-4 text-outline transition-colors group-focus-within:text-primary"
+        className="absolute left-3 text-outline transition-colors group-focus-within:text-primary"
       />
       <input
         type="search"
@@ -32,16 +32,16 @@ export function SearchField({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         aria-label="분실물 검색"
-        className="h-full w-full bg-transparent pl-12 pr-12 font-body-md text-body-md text-on-surface outline-none placeholder:text-outline/70"
+        className="h-full w-full bg-transparent pl-10 pr-10 text-[15px] text-on-surface outline-none placeholder:text-outline"
       />
       {value ? (
         <button
           type="button"
           onClick={() => onChange('')}
           aria-label="검색어 지우기"
-          className="absolute right-2 flex h-8 w-8 items-center justify-center rounded-full bg-surface-container text-on-surface-variant transition-colors hover:bg-surface-variant"
+          className="absolute right-2 flex h-6 w-6 items-center justify-center rounded-full bg-outline text-white transition-colors hover:bg-on-surface-variant"
         >
-          <Icon name="close" size={20} />
+          <Icon name="close" size={16} />
         </button>
       ) : null}
     </div>

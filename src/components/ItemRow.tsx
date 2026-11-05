@@ -13,11 +13,11 @@ export function ItemRow({ item, note }: { item: LostItem; note?: string }) {
   return (
     <Link
       to={`/items/${item.id}`}
-      className={`group relative flex w-full gap-4 overflow-hidden rounded-lg bg-surface-container-lowest p-3 shadow-level1 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-        returned ? 'opacity-75 hover:opacity-100' : 'hover:-translate-y-1 hover:shadow-level1-hover'
+      className={`group relative flex w-full gap-4 border-b border-outline-variant bg-surface-container-lowest py-3 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+        returned ? 'opacity-75 hover:opacity-100' : 'hover:bg-surface-container-low'
       }`}
     >
-      <div className={`relative h-24 w-24 shrink-0 overflow-hidden rounded-md bg-surface-container ${returned ? 'grayscale' : ''}`}>
+      <div className={`relative h-24 w-24 shrink-0 overflow-hidden rounded bg-surface-container ${returned ? 'grayscale' : ''}`}>
         <ItemThumb src={item.imageUrl} alt={item.name} category={item.category} className="h-full w-full" />
         <StatusChip status={item.status} className="absolute right-1.5 top-1.5" />
       </div>

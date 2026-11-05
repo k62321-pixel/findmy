@@ -18,7 +18,7 @@ export function BottomNav() {
   const tabs = user?.isAdmin ? [...TABS, ADMIN_TAB] : TABS
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-50 bg-surface/90 pb-safe shadow-bar-top backdrop-blur-xl">
+    <nav className="fixed inset-x-0 bottom-0 z-50 bg-surface-container-lowest pb-safe shadow-bar-top">
       <div className="mx-auto flex h-16 max-w-container items-center justify-around px-margin-mobile">
         {tabs.map((tab) => (
           <NavLink
@@ -26,18 +26,14 @@ export function BottomNav() {
             to={tab.to}
             end={tab.end}
             className={({ isActive }) =>
-              `flex h-14 w-16 flex-col items-center justify-center gap-0.5 rounded-md transition-colors ${
-                isActive ? 'text-primary' : 'text-on-surface-variant hover:text-on-surface'
+              `flex h-14 w-16 flex-col items-center justify-center gap-0.5 transition-colors ${
+                isActive ? 'text-on-surface' : 'text-outline hover:text-on-surface-variant'
               }`
             }
           >
             {({ isActive }) => (
               <>
-                <span
-                  className={`relative flex h-8 w-14 items-center justify-center rounded-full transition-colors ${
-                    isActive ? 'bg-primary-fixed' : ''
-                  }`}
-                >
+                <span className="relative flex h-7 w-14 items-center justify-center">
                   <Icon name={tab.icon} filled={isActive} />
                   {tab.to === '/chats' && unread > 0 ? (
                     <span
@@ -48,7 +44,7 @@ export function BottomNav() {
                     </span>
                   ) : null}
                 </span>
-                <span className="font-label-sm text-label-sm">{tab.label}</span>
+                <span className={`text-[11px] leading-4 ${isActive ? 'font-semibold' : ''}`}>{tab.label}</span>
               </>
             )}
           </NavLink>

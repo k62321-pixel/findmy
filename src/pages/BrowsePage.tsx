@@ -1,28 +1,32 @@
-import { useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { AppShell } from '../components/AppShell'
 import { CategoryFilter } from '../components/CategoryFilter'
 import { EmptyState } from '../components/EmptyState'
 import { Icon } from '../components/Icon'
-import { ItemRow } from '../components/ItemRow'
+import { ItemCard } from '../components/ItemCard'
 import { LoadError } from '../components/LoadError'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 import { SearchField } from '../components/SearchField'
+import { UsageBanner } from '../components/UsageBanner'
 import { filterItems } from '../lib/filter'
 import { useItems } from '../store/ItemsProvider'
 import { SITE_TITLE } from '../lib/site'
 import type { CategoryId } from '../types'
 
-const STEPS = [
-  { icon: 'edit_note', title: '신고하기', body: '주운 물건의 사진과 장소를 등록해요.' },
-  { icon: 'meeting_room', title: '교무실에 맡기기', body: '물건을 1층 교무실로 가져다주세요.' },
-  { icon: 'handshake', title: '주인 찾기', body: '주인은 ‘내 물건 찾기’ 후 교무실에서 받아요.' },
-]
-
 export function BrowsePage() {
   const { items, status } = useItems()
   const [searchParams, setSearchParams] = useSearchParams()
   const [category, setCategory] = useState<CategoryId | 'all'>('all')
+
+  // The header logo links here with a fresh `home` token: reset to the untouched screen.
+  const location = useLocation()
+  const homeToken = (location.state as { home?: number } | null)?.home
+  useEffect(() => {
+    if (homeToken === undefined) return
+    setCategory('all')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [homeToken])
 
   const query = searchParams.get('q') ?? ''
   const setQuery = (next: string) => {
@@ -33,46 +37,25 @@ export function BrowsePage() {
 
   return (
     <AppShell title={SITE_TITLE}>
-      <section className="flex flex-col gap-4 px-margin-mobile pb-2 pt-4 md:px-margin-desktop">
-        <ol className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {STEPS.map((step, i) => (
-            <li
-              key={step.title}
-              className="flex items-start gap-3 rounded-lg bg-surface-container-low p-4 sm:flex-col sm:items-center sm:text-center"
-            >
-              <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-fixed text-primary">
-                <Icon name={step.icon} size={22} />
-                <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary font-label-sm text-[11px] text-on-primary">
-                  {i + 1}
-                </span>
-              </span>
-              <div className="flex flex-col gap-0.5">
-                <span className="font-label-md text-label-md text-on-surface">{step.title}</span>
-                <span className="break-keep font-label-sm text-label-sm text-on-surface-variant">{step.body}</span>
-              </div>
-            </li>
-          ))}
-        </ol>
-
+      <section className="flex flex-col gap-1 border-b border-outline-variant px-margin-mobile pt-3 md:px-margin-desktop">
         <SearchField value={query} onChange={setQuery} />
-
-        <Link
-          to="/report"
-          className="flex h-11 w-full items-center justify-center gap-2 rounded-md bg-surface-container-lowest font-label-md text-label-md text-primary outline outline-1 outline-outline-variant/60 transition-colors hover:bg-surface-container-low active:scale-[0.99]"
-        >
-          <Icon name="add_circle" size={20} />
-          물건을 주웠다면? 습득물 신고하기
-        </Link>
-
         <CategoryFilter value={category} onChange={setCategory} />
       </section>
 
-      <section className="flex flex-col gap-4 px-margin-mobile py-6 md:px-margin-desktop">
-        <div className="mb-2 flex items-center justify-between">
-          <h2 className="font-headline-md text-headline-md text-on-surface">
+      <div className="px-margin-mobile pt-5 md:px-margin-desktop">
+        <UsageBanner />
+      </div>
+
+      <section id="items" className="flex scroll-mt-20 flex-col gap-4 px-margin-mobile pb-6 pt-6 md:px-margin-desktop">
+        <div className="flex items-end justify-between">
+          <h2 className="text-[18px] font-bold leading-6 text-on-surface">
             {query || category !== 'all' ? '검색 결과' : '최근 등록된 습득물'}
+            <span className="ml-1.5 text-[14px] font-normal text-outline">{results.length}</span>
           </h2>
-          <span className="font-label-sm text-label-sm text-on-surface-variant">{results.length}건</span>
+          <Link to="/report" className="flex items-center gap-0.5 text-[13px] font-semibold text-primary">
+            <Icon name="add" size={18} />
+            습득물 신고
+          </Link>
         </div>
 
         {status === 'loading' ? (
@@ -80,9 +63,9 @@ export function BrowsePage() {
         ) : status === 'error' ? (
           <LoadError />
         ) : results.length > 0 ? (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
             {results.map((item) => (
-              <ItemRow key={item.id} item={item} />
+              <ItemCard key={item.id} item={item} />
             ))}
           </div>
         ) : (
