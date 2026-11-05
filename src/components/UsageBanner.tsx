@@ -49,7 +49,8 @@ const SLIDES: Slide[] = [
 
 const AUTOPLAY_MS = 5000
 
-export function UsageBanner() {
+/** `className` sets the banner's height (it may grow to fill the first screen). */
+export function UsageBanner({ className = '' }: { className?: string }) {
   const [index, setIndex] = useState(0)
   const [paused, setPaused] = useState(false)
   const touchX = useRef<number | null>(null)
@@ -69,7 +70,7 @@ export function UsageBanner() {
     <section
       aria-roledescription="carousel"
       aria-label="이용 방법"
-      className="group relative overflow-hidden rounded-xl"
+      className={`group relative flex overflow-hidden rounded-xl ${className}`}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onTouchStart={(e) => {
@@ -86,7 +87,7 @@ export function UsageBanner() {
       }}
     >
       <div
-        className="flex transition-transform duration-500 ease-out"
+        className="flex w-full transition-transform duration-500 ease-out"
         style={{ transform: `translateX(-${index * 100}%)` }}
       >
         {SLIDES.map((slide, i) => (
@@ -96,7 +97,7 @@ export function UsageBanner() {
             aria-roledescription="slide"
             aria-label={`${i + 1} / ${count}`}
             aria-hidden={i !== index}
-            className="relative flex h-[168px] w-full shrink-0 items-center overflow-hidden px-6 sm:h-[220px] md:h-[300px] md:px-24"
+            className="relative flex h-full w-full shrink-0 items-center overflow-hidden px-6 md:px-24"
             style={{ backgroundColor: slide.bg, color: slide.ink }}
           >
             {/* Oversized single-colour glyph cropped by the edge — a graphic, not a sticker. */}

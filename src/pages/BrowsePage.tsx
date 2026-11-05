@@ -8,7 +8,29 @@ import { ItemCard } from '../components/ItemCard'
 import { LoadError } from '../components/LoadError'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 import { SearchField } from '../components/SearchField'
+import { ShortcutTiles } from '../components/ShortcutTiles'
 import { UsageBanner } from '../components/UsageBanner'
+import type { LostItem } from '../types'
+
+/** One-line tally of where every item stands — "보관중 5 · 수령 신청 1 · 반환 완료 3". */
+function StatusSummary({ items }: { items: LostItem[] }) {
+  const count = (s: LostItem['status']) => items.filter((it) => it.status === s).length
+  const cells = [
+    { label: '보관중', value: count('stored') },
+    { label: '수령 신청', value: count('requested') },
+    { label: '반환 완료', value: count('returned') },
+  ]
+  return (
+    <dl className="grid grid-cols-3 divide-x divide-outline-variant rounded-lg border border-outline-variant py-3">
+      {cells.map((c) => (
+        <div key={c.label} className="flex flex-col items-center gap-0.5">
+          <dt className="text-[12px] text-on-surface-variant md:text-[13px]">{c.label}</dt>
+          <dd className="text-[18px] font-bold text-on-surface md:text-[20px]">{c.value}</dd>
+        </div>
+      ))}
+    </dl>
+  )
+}
 import { filterItems } from '../lib/filter'
 import { useItems } from '../store/ItemsProvider'
 import { SITE_TITLE } from '../lib/site'
@@ -37,13 +59,25 @@ export function BrowsePage() {
 
   return (
     <AppShell title={SITE_TITLE}>
-      <section className="flex flex-col gap-1 border-b border-outline-variant px-margin-mobile pt-3 md:px-margin-desktop">
-        <SearchField value={query} onChange={setQuery} />
-        <CategoryFilter value={category} onChange={setCategory} />
-      </section>
+      {/* First screen: everything above the feed fills the viewport (minus header and tab
+          bar), so items only appear once you scroll — the banner absorbs the extra height. */}
+      <div className="flex min-h-[calc(100svh-128px)] flex-col">
+        <section className="flex flex-col gap-1 border-b border-outline-variant px-margin-mobile pt-3 md:px-margin-desktop">
+          <SearchField value={query} onChange={setQuery} />
+          <CategoryFilter value={category} onChange={setCategory} />
+        </section>
 
-      <div className="px-margin-mobile pt-5 md:px-margin-desktop">
-        <UsageBanner />
+        <div className="flex flex-1 flex-col px-margin-mobile pt-5 md:px-margin-desktop">
+          <UsageBanner className="min-h-[200px] flex-1 md:min-h-[320px]" />
+        </div>
+
+        <div className="px-margin-mobile pt-6 md:px-margin-desktop">
+          <ShortcutTiles />
+        </div>
+
+        <div className="px-margin-mobile pb-2 pt-6 md:px-margin-desktop">
+          <StatusSummary items={items} />
+        </div>
       </div>
 
       <section id="items" className="flex scroll-mt-20 flex-col gap-4 px-margin-mobile pb-6 pt-6 md:px-margin-desktop">
