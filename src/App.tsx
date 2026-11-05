@@ -6,6 +6,8 @@ import { ReportPage } from './pages/ReportPage'
 import { MyItemsPage } from './pages/MyItemsPage'
 import { LoginPage } from './pages/LoginPage'
 import { AdminPage } from './pages/AdminPage'
+import { ChatListPage } from './pages/ChatListPage'
+import { ChatRoomPage } from './pages/ChatRoomPage'
 import { ProtectedRoute } from './components/ProtectedRoute'
 
 /** Route changes should land at the top of the new screen, not mid-scroll. */
@@ -38,6 +40,22 @@ export default function App() {
           element={
             <ProtectedRoute>
               <MyItemsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/chats"
+          element={
+            <ProtectedRoute>
+              <ChatListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/chats/:id"
+          element={
+            <ProtectedRoute>
+              <ChatRoomPage />
             </ProtectedRoute>
           }
         />

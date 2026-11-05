@@ -9,6 +9,7 @@ import { LoadError } from '../components/LoadError'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 import { StatusChip } from '../components/StatusChip'
 import { categoryOf } from '../lib/categories'
+import { openChat } from '../lib/chat'
 import { formatFoundAt, formatFoundDate } from '../lib/format'
 import { useAuth } from '../store/AuthProvider'
 import { useItems } from '../store/ItemsProvider'
@@ -24,6 +25,7 @@ export function ItemDetailPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [viewingPhoto, setViewingPhoto] = useState(false)
+  const [openingChat, setOpeningChat] = useState(false)
   const item = getItem(id)
 
   if (!item) {
@@ -65,6 +67,23 @@ export function ItemDetailPage() {
     }
     setError('')
     setClaiming(true)
+  }
+
+  async function handleChatClick() {
+    if (!user) {
+      navigate('/login', { state: { from: location } })
+      return
+    }
+    setOpeningChat(true)
+    setError('')
+    try {
+      const chat = await openChat(item!.id)
+      navigate(`/chats/${chat.id}`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '채팅방을 열지 못했습니다.')
+    } finally {
+      setOpeningChat(false)
+    }
   }
 
   async function run(action: () => Promise<unknown>, onDone?: () => void) {
@@ -158,13 +177,37 @@ export function ItemDetailPage() {
                 {error}
               </p>
             ) : null}
-            <PrimaryAction
-              item={item}
-              signedIn={!!user}
-              submitting={submitting}
-              onClaim={handleClaimClick}
-              onCancel={() => run(() => cancelClaim(item.id))}
-            />
+            <div className="flex gap-2">
+              <div className="min-w-0 flex-1">
+                <PrimaryAction
+                  item={item}
+                  signedIn={!!user}
+                  submitting={submitting}
+                  onClaim={handleClaimClick}
+                  onCancel={() => run(() => cancelClaim(item.id))}
+                />
+              </div>
+              {item.reportedByMe ? (
+                <Link
+                  to="/chats"
+                  aria-label="이 물건에 온 채팅 보기"
+                  className="flex w-14 shrink-0 items-center justify-center rounded-md text-primary outline outline-1 outline-outline-variant transition-colors hover:bg-surface-container"
+                >
+                  <Icon name="forum" />
+                </Link>
+              ) : item.status !== 'returned' ? (
+                <button
+                  type="button"
+                  onClick={handleChatClick}
+                  disabled={openingChat}
+                  className="flex shrink-0 items-center justify-center gap-1 rounded-md px-4 font-label-md text-label-md text-primary outline outline-1 outline-outline-variant transition-colors hover:bg-surface-container disabled:opacity-60"
+                >
+                  <Icon name="chat" />
+                  <span className="hidden sm:inline">습득자와 채팅</span>
+                  <span className="sm:hidden">채팅</span>
+                </button>
+              ) : null}
+            </div>
           </div>
         </div>
       </div>

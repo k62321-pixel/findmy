@@ -122,6 +122,19 @@ ID 토큰(JWT)을 받아온다 → `AuthProvider.loginWithGoogle`이 그 토큰�
 - `DELETE /api/items/<id>` — **관리자** 게시물·사진 삭제
 - `GET /api/uploads/<filename>` — 업로드된 사진 (공개)
 
+## 채팅 API (습득자 ↔ 주인)
+
+물건 1개 × 문의자 1명마다 채팅방 하나. 상대는 항상 그 물건의 신고자(습득자)입니다.
+서버리스(Vercel)라 WebSocket 대신 폴링을 씁니다 — 채팅방 4초, 목록 15초, 탭바 배지 30초(화면이 보일 때만).
+
+- `POST /api/items/<id>/chat` — 내 채팅방 열기(없으면 생성). 본인 신고 물건·반환완료 물건은 새로 못 엶. 1시간 10개 제한
+- `GET /api/chats` — 내 채팅 목록. 습득자에게는 메시지가 1개 이상 있는 방만 보임. 관리자는 `?all=1`로 전체 열람
+- `GET /api/chats/unread` — 읽지 않은 채팅방 수
+- `GET /api/chats/<id>` — 방 정보 + 최근 메시지 200개, 읽음 처리. 참여자·관리자 외에는 404
+- `POST /api/chats/<id>/messages` — `{"content"}` (≤500자, 1분 20개 제한). 관리자는 읽기 전용, 반환완료 후에는 `409 chat_closed`
+
+물건을 삭제하면 그 물건의 채팅방과 메시지도 함께 삭제됩니다.
+
 사진은 파일명·확장자를 믿지 않고 파일 앞부분 바이트로 PNG/JPEG/GIF/WEBP인지 확인한 뒤
 `uuid` 파일명으로 DB의 `images` 테이블에 저장합니다. 사진은 3MB로 제한됩니다(`413 file_too_large`).
 

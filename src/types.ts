@@ -53,6 +53,38 @@ export interface Category {
   icon: string
 }
 
+/**
+ * asker = the person who opened the room about an item, reporter = whoever found it,
+ * observer = an admin reading the room (read-only).
+ */
+export type ChatRole = 'asker' | 'reporter' | 'observer'
+
+export interface ChatSummary {
+  id: string
+  itemId: string
+  itemName: string
+  itemStatus: ItemStatus
+  itemCategory: CategoryId
+  itemImageUrl: string | null
+  myRole: ChatRole
+  askerName: string
+  reporterName: string
+  lastMessage: string | null
+  lastMessageAt: string | null
+  createdAt: string
+  unread: boolean
+  /** The item was returned — the room stays readable but no new messages. */
+  closed: boolean
+}
+
+export interface ChatMessage {
+  id: string
+  content: string
+  createdAt: string
+  mine: boolean
+  senderRole: 'asker' | 'reporter'
+}
+
 /** A user-submitted inquiry (문의사항). Only admins can list them. */
 export interface Inquiry {
   id: string

@@ -126,6 +126,40 @@ def init_db(storage_location: str) -> None:
             )
             """
         )
+        # One chat room per (item, person asking about it); the item's reporter is the other side.
+        # last_* columns are denormalized so the chat list needs no per-room message query.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS chats (
+                id TEXT PRIMARY KEY,
+                item_id TEXT NOT NULL,
+                asker_sub TEXT NOT NULL,
+                asker_name TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                last_message TEXT,
+                last_message_at TEXT,
+                last_sender_sub TEXT,
+                asker_read_at TEXT,
+                reporter_read_at TEXT,
+                UNIQUE (item_id, asker_sub)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS chat_messages (
+                id TEXT PRIMARY KEY,
+                chat_id TEXT NOT NULL,
+                sender_sub TEXT NOT NULL,
+                content TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_chats_asker ON chats(asker_sub)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_chats_item ON chats(item_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_chat_messages_chat ON chat_messages(chat_id, created_at)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_chat_messages_sender ON chat_messages(sender_sub, created_at)")
         # Items reported before the storage place was renamed follow the new name.
         conn.execute("UPDATE items SET storage = ? WHERE storage <> ?", (storage_location, storage_location))
         conn.execute("CREATE INDEX IF NOT EXISTS idx_items_reporter ON items(reporter_sub)")

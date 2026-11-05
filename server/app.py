@@ -77,6 +77,11 @@ MAX_INQUIRIES_PER_HOUR = 5
 MAX_NAME_LENGTH = 100
 MAX_LOCATION_LENGTH = 200
 MAX_DESCRIPTION_LENGTH = 1000
+MAX_CHAT_MESSAGE_LENGTH = 500
+MAX_CHAT_MESSAGES_PER_MINUTE = 20
+MAX_NEW_CHATS_PER_HOUR = 10
+# Only the most recent messages are sent; a lost-item conversation rarely gets near this.
+CHAT_HISTORY_LIMIT = 200
 
 if os.environ.get("VERCEL") == "1" and not IS_POSTGRES:
     raise RuntimeError("DATABASE_URL must be set on Vercel — serverless functions have no persistent disk.")
@@ -522,11 +527,240 @@ def delete_item(user, item_id):
         if not row:
             return jsonify(error="not_found"), 404
         conn.execute("DELETE FROM items WHERE id = ?", (item_id,))
+        conn.execute(
+            "DELETE FROM chat_messages WHERE chat_id IN (SELECT id FROM chats WHERE item_id = ?)",
+            (item_id,),
+        )
+        conn.execute("DELETE FROM chats WHERE item_id = ?", (item_id,))
         if row["image_filename"]:
             conn.execute("DELETE FROM images WHERE filename = ?", (row["image_filename"],))
 
     app.logger.info("Admin %s deleted item %s", user["email"], item_id)
     return jsonify(ok=True)
+
+
+# ---------------------------------------------------------------------------
+# Chats (습득자 ↔ 주인 찾는 사람)
+#
+# One room per (item, asker). The asker is whoever pressed "채팅하기" on the item;
+# the other participant is always the item's reporter. Admins can read any room
+# (moderation) but cannot post. Rooms become read-only once the item is returned.
+# There are no websockets on serverless hosts, so the client polls GET /api/chats/<id>.
+# ---------------------------------------------------------------------------
+
+_CHAT_SELECT = """
+    SELECT c.*, i.name AS item_name, i.status AS item_status, i.category AS item_category,
+           i.image_filename AS item_image, i.reporter_sub, i.reporter_name
+      FROM chats c JOIN items i ON i.id = c.item_id
+"""
+
+
+def _chat_role(row, user):
+    if row["asker_sub"] == user["sub"]:
+        return "asker"
+    if row["reporter_sub"] == user["sub"]:
+        return "reporter"
+    if _is_admin(user):
+        return "observer"
+    return None
+
+
+def _chat_unread(row, role):
+    if role not in ("asker", "reporter") or not row["last_message_at"]:
+        return False
+    my_sub_sent_last = row["last_sender_sub"] == (row["asker_sub"] if role == "asker" else row["reporter_sub"])
+    read_at = row["asker_read_at"] if role == "asker" else row["reporter_read_at"]
+    return not my_sub_sent_last and (not read_at or read_at < row["last_message_at"])
+
+
+def _serialize_chat(row, user):
+    role = _chat_role(row, user)
+    return {
+        "id": row["id"],
+        "itemId": row["item_id"],
+        "itemName": row["item_name"],
+        "itemStatus": row["item_status"],
+        "itemCategory": row["item_category"],
+        "itemImageUrl": f"/api/uploads/{row['item_image']}" if row["item_image"] else None,
+        "myRole": role,
+        "askerName": row["asker_name"],
+        "reporterName": row["reporter_name"],
+        "lastMessage": row["last_message"],
+        "lastMessageAt": row["last_message_at"],
+        "createdAt": row["created_at"],
+        "unread": _chat_unread(row, role),
+        "closed": row["item_status"] == "returned",
+    }
+
+
+def _serialize_message(row, chat_row, user):
+    return {
+        "id": row["id"],
+        "content": row["content"],
+        "createdAt": row["created_at"],
+        "mine": row["sender_sub"] == user["sub"],
+        "senderRole": "asker" if row["sender_sub"] == chat_row["asker_sub"] else "reporter",
+    }
+
+
+def _fetch_chat(conn, chat_id):
+    return conn.execute(f"{_CHAT_SELECT} WHERE c.id = ?", (chat_id,)).fetchone()
+
+
+@app.post("/api/items/<item_id>/chat")
+@login_required
+def open_chat(user, item_id):
+    """Returns the caller's room for this item, creating it on first use."""
+    with get_connection() as conn:
+        item = _fetch_item(conn, item_id)
+        if not item:
+            return jsonify(error="not_found"), 404
+        if item["reporter_sub"] == user["sub"]:
+            return jsonify(error="own_item_chat"), 400
+
+        existing = conn.execute(
+            "SELECT id FROM chats WHERE item_id = ? AND asker_sub = ?", (item_id, user["sub"])
+        ).fetchone()
+        if existing:
+            return jsonify(chat=_serialize_chat(_fetch_chat(conn, existing["id"]), user))
+
+        if item["status"] == "returned":
+            return jsonify(error="already_returned"), 409
+        if not _is_admin(user):
+            an_hour_ago = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+            recent = conn.execute(
+                "SELECT COUNT(*) AS n FROM chats WHERE asker_sub = ? AND created_at > ?",
+                (user["sub"], an_hour_ago),
+            ).fetchone()["n"]
+            if recent >= MAX_NEW_CHATS_PER_HOUR:
+                return jsonify(error="chat_rate_limited"), 429
+
+        # ON CONFLICT: a double-tap creating the room twice just reuses the first one.
+        conn.execute(
+            """
+            INSERT INTO chats (id, item_id, asker_sub, asker_name, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT (item_id, asker_sub) DO NOTHING
+            """,
+            (f"cht-{uuid.uuid4().hex[:12]}", item_id, user["sub"], user["name"], _now()),
+        )
+        row = conn.execute(
+            f"{_CHAT_SELECT} WHERE c.item_id = ? AND c.asker_sub = ?", (item_id, user["sub"])
+        ).fetchone()
+
+    return jsonify(chat=_serialize_chat(row, user)), 201
+
+
+@app.get("/api/chats")
+@login_required
+def list_chats(user):
+    """My rooms. Reporters only see rooms that have at least one message, so merely
+    opening a room doesn't notify anyone. Admins can pass ?all=1 to review every room."""
+    with get_connection() as conn:
+        if request.args.get("all") == "1":
+            if not _is_admin(user):
+                return jsonify(error="forbidden"), 403
+            rows = conn.execute(
+                f"{_CHAT_SELECT} WHERE c.last_message_at IS NOT NULL ORDER BY c.last_message_at DESC"
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                f"""{_CHAT_SELECT}
+                 WHERE c.asker_sub = ? OR (i.reporter_sub = ? AND c.last_message_at IS NOT NULL)
+                 ORDER BY COALESCE(c.last_message_at, c.created_at) DESC""",
+                (user["sub"], user["sub"]),
+            ).fetchall()
+    return jsonify(chats=[_serialize_chat(row, user) for row in rows])
+
+
+@app.get("/api/chats/unread")
+@login_required
+def unread_chats(user):
+    with get_connection() as conn:
+        count = conn.execute(
+            """
+            SELECT COUNT(*) AS n FROM chats c JOIN items i ON i.id = c.item_id
+             WHERE c.last_message_at IS NOT NULL AND c.last_sender_sub <> ?
+               AND ((c.asker_sub = ? AND (c.asker_read_at IS NULL OR c.asker_read_at < c.last_message_at))
+                 OR (i.reporter_sub = ? AND (c.reporter_read_at IS NULL OR c.reporter_read_at < c.last_message_at)))
+            """,
+            (user["sub"], user["sub"], user["sub"]),
+        ).fetchone()["n"]
+    return jsonify(count=count)
+
+
+@app.get("/api/chats/<chat_id>")
+@login_required
+def get_chat(user, chat_id):
+    with get_connection() as conn:
+        chat = _fetch_chat(conn, chat_id)
+        role = _chat_role(chat, user) if chat else None
+        if not role:
+            # Same answer for "missing" and "not yours" so room ids can't be probed.
+            return jsonify(error="chat_not_found"), 404
+
+        rows = conn.execute(
+            """
+            SELECT * FROM (
+                SELECT * FROM chat_messages WHERE chat_id = ? ORDER BY created_at DESC, id DESC LIMIT ?
+            ) recent ORDER BY created_at ASC, id ASC
+            """,
+            (chat_id, CHAT_HISTORY_LIMIT),
+        ).fetchall()
+
+        if role in ("asker", "reporter") and _chat_unread(chat, role):
+            conn.execute(f"UPDATE chats SET {role}_read_at = ? WHERE id = ?", (_now(), chat_id))
+            chat = _fetch_chat(conn, chat_id)
+
+    return jsonify(
+        chat=_serialize_chat(chat, user),
+        messages=[_serialize_message(row, chat, user) for row in rows],
+    )
+
+
+@app.post("/api/chats/<chat_id>/messages")
+@login_required
+def send_chat_message(user, chat_id):
+    content = ((request.get_json(silent=True) or {}).get("content") or "").strip()
+    if not content:
+        return jsonify(error="missing_fields"), 400
+    if len(content) > MAX_CHAT_MESSAGE_LENGTH:
+        return jsonify(error="field_too_long"), 400
+
+    with get_connection() as conn:
+        chat = _fetch_chat(conn, chat_id)
+        role = _chat_role(chat, user) if chat else None
+        if not role:
+            return jsonify(error="chat_not_found"), 404
+        if role == "observer":
+            return jsonify(error="forbidden"), 403
+        if chat["item_status"] == "returned":
+            return jsonify(error="chat_closed"), 409
+
+        a_minute_ago = (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat()
+        recent = conn.execute(
+            "SELECT COUNT(*) AS n FROM chat_messages WHERE sender_sub = ? AND created_at > ?",
+            (user["sub"], a_minute_ago),
+        ).fetchone()["n"]
+        if recent >= MAX_CHAT_MESSAGES_PER_MINUTE:
+            return jsonify(error="chat_message_rate_limited"), 429
+
+        now = _now()
+        message_id = f"msg-{uuid.uuid4().hex[:12]}"
+        conn.execute(
+            "INSERT INTO chat_messages (id, chat_id, sender_sub, content, created_at) VALUES (?, ?, ?, ?, ?)",
+            (message_id, chat_id, user["sub"], content, now),
+        )
+        conn.execute(
+            f"""
+            UPDATE chats SET last_message = ?, last_message_at = ?, last_sender_sub = ?, {role}_read_at = ?
+             WHERE id = ?
+            """,
+            (content[:100], now, user["sub"], now, chat_id),
+        )
+        message = conn.execute("SELECT * FROM chat_messages WHERE id = ?", (message_id,)).fetchone()
+
+    return jsonify(message=_serialize_message(message, chat, user)), 201
 
 
 # ---------------------------------------------------------------------------
