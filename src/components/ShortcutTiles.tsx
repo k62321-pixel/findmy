@@ -1,84 +1,76 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { Icon } from './Icon'
-import { InquiryDialog } from './InquiryDialog'
-import { useAuth } from '../store/AuthProvider'
-
-interface Tile {
-  label: string
-  icon: string
-  /** Icon colour — each tile gets its own so the row reads at a glance. */
-  color: string
-  to?: string
-  action?: 'inquiry' | 'desk'
-}
-
-const TILES: Tile[] = [
-  { label: '습득물 신고', icon: 'add_a_photo', color: '#e8384f', to: '/report' },
-  { label: '내 물건', icon: 'inventory_2', color: '#3b82f6', to: '/my-items' },
-  { label: '채팅', icon: 'forum', color: '#16a34a', to: '/chats' },
-  { label: '새로 들어온', icon: 'new_releases', color: '#f59e0b', to: '#items' },
-  { label: '교무실 안내', icon: 'meeting_room', color: '#8b5cf6', action: 'desk' },
-  { label: '문의하기', icon: 'support_agent', color: '#0ea5a4', action: 'inquiry' },
-]
+import { isToday, matchKeywords } from '../lib/matching'
+import { useAlertsSeenAt, useKeywords, useRecentlyViewed, useSavedItems } from '../lib/recent'
+import { useItems } from '../store/ItemsProvider'
 
 const TILE_BOX =
-  'flex aspect-square w-full max-w-[96px] items-center justify-center rounded-[22%] bg-surface-container-low transition-colors group-hover:bg-surface-container'
-const TILE_LABEL = 'w-full truncate text-center text-[12px] leading-4 text-on-surface md:text-[14px] md:leading-5'
+  'relative flex aspect-square w-full max-w-[96px] items-center justify-center rounded-[22%] bg-surface-container-low transition-colors group-hover:bg-surface-container'
+const TILE_LABEL = 'w-full truncate text-center text-[13px] leading-4 text-on-surface md:text-[14px] md:leading-5'
+const TILE = 'group flex w-full min-w-0 flex-col items-center gap-2'
 
-/** Marketplace-style shortcut row under the banner. */
+/** Shortcut row under the banner — each tile opens one of the finder tools. */
 export function ShortcutTiles() {
-  const { user } = useAuth()
-  const navigate = useNavigate()
-  const location = useLocation()
-  const [dialog, setDialog] = useState<'inquiry' | 'desk' | null>(null)
+  const { items } = useItems()
+  const saved = useSavedItems()
+  const recent = useRecentlyViewed()
+  const keywords = useKeywords()
+  const seenAt = useAlertsSeenAt()
+  const [deskOpen, setDeskOpen] = useState(false)
 
-  function open(action: 'inquiry' | 'desk') {
-    if (action === 'inquiry' && !user) {
-      navigate('/login', { state: { from: location } })
-      return
-    }
-    setDialog(action)
-  }
+  // Keyword matches that appeared since the alerts page was last opened.
+  const newMatches = matchKeywords(items, keywords).filter(
+    (it) => !seenAt || new Date(it.foundAt) > new Date(seenAt),
+  ).length
+  const todayCount = items.filter((it) => isToday(it.foundAt)).length
+
+  // `short` is what fits under a tile on a phone (six tiles share ~360px there).
+  const tiles = [
+    { label: '찜한 물건', short: '찜', icon: 'favorite', color: '#e8384f', to: '/saved', badge: 0, note: saved.length },
+    { label: '최근 본 물건', short: '최근 본', icon: 'history', color: '#3b82f6', to: '/recent', badge: 0, note: recent.length },
+    { label: '키워드 알림', short: '키워드', icon: 'notifications_active', color: '#f59e0b', to: '/alerts', badge: newMatches, note: 0 },
+    { label: '오늘 들어온', short: '오늘', icon: 'today', color: '#16a34a', to: '/today', badge: 0, note: todayCount },
+    { label: '장소별 찾기', short: '장소별', icon: 'location_on', color: '#8b5cf6', to: '/places', badge: 0, note: 0 },
+  ]
 
   return (
     <>
       <ul className="mx-auto grid w-full max-w-[720px] grid-cols-6 gap-x-2 md:gap-x-6">
-        {TILES.map((tile) => {
-          const body = (
-            <>
+        {tiles.map((tile) => (
+          <li key={tile.label} style={{ color: tile.color }}>
+            <Link to={tile.to} className={TILE}>
               <span className={TILE_BOX}>
                 <Icon name={tile.icon} size={30} filled className="md:!text-[38px]" />
+                {tile.badge > 0 ? (
+                  <span className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-primary px-1 text-[11px] font-bold text-on-primary">
+                    {tile.badge > 9 ? '9+' : tile.badge}
+                  </span>
+                ) : null}
               </span>
-              <span className={TILE_LABEL}>{tile.label}</span>
-            </>
-          )
-          const cls = 'group flex min-w-0 flex-col items-center gap-2'
-          return (
-            <li key={tile.label} style={{ color: tile.color }}>
-              {tile.action ? (
-                <button type="button" onClick={() => open(tile.action!)} className={`${cls} w-full`}>
-                  {body}
-                </button>
-              ) : tile.to!.startsWith('#') ? (
-                <a href={tile.to} className={cls}>
-                  {body}
-                </a>
-              ) : (
-                <Link to={tile.to!} className={cls}>
-                  {body}
-                </Link>
-              )}
-            </li>
-          )
-        })}
+              <span className={TILE_LABEL}>
+                <span className="md:hidden">{tile.short}</span>
+                <span className="hidden md:inline">{tile.label}</span>
+                {tile.note > 0 ? <span className="ml-0.5 hidden text-outline md:inline">{tile.note}</span> : null}
+              </span>
+            </Link>
+          </li>
+        ))}
+        <li style={{ color: '#0ea5a4' }}>
+          <button type="button" onClick={() => setDeskOpen(true)} className={TILE}>
+            <span className={TILE_BOX}>
+              <Icon name="meeting_room" size={30} filled className="md:!text-[38px]" />
+            </span>
+            <span className={TILE_LABEL}>
+              <span className="md:hidden">교무실</span>
+              <span className="hidden md:inline">교무실 안내</span>
+            </span>
+          </button>
+        </li>
       </ul>
 
-      {dialog === 'inquiry'
-        ? createPortal(<InquiryDialog onClose={() => setDialog(null)} />, document.body)
-        : null}
-      {dialog === 'desk' ? createPortal(<DeskDialog onClose={() => setDialog(null)} />, document.body) : null}
+      {deskOpen ? createPortal(<DeskDialog onClose={() => setDeskOpen(false)} />, document.body) : null}
     </>
   )
 }
@@ -107,11 +99,7 @@ function DeskDialog({ onClose }: { onClose: () => void }) {
         <p className="break-keep text-[13px] leading-5 text-on-surface-variant">
           주운 물건은 신고 후 교무실에 맡겨 주세요. 주인은 ‘내 물건 찾기’로 신청한 뒤 교무실에서 받아 갑니다.
         </p>
-        <button
-          type="button"
-          onClick={onClose}
-          className="h-12 rounded bg-primary text-[15px] font-bold text-on-primary"
-        >
+        <button type="button" onClick={onClose} className="h-12 rounded bg-primary text-[15px] font-bold text-on-primary">
           확인
         </button>
       </div>

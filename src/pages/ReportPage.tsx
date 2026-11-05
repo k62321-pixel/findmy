@@ -195,7 +195,7 @@ export function ReportPage() {
                 placeholder={
                   '- 색상, 브랜드, 이름표, 케이스 등 물건의 특징을 자세히 적어주세요.\n- 주인만 알 수 있는 특징(안쪽 이름, 스티커 등)은 적지 않는 게 좋아요.\n- 전화번호 등 개인정보는 입력하지 마세요.'
                 }
-                className="w-full resize-none bg-transparent text-[15px] leading-6 text-on-surface placeholder:text-outline focus:outline-none"
+                className="w-full resize-none bg-transparent text-[16px] leading-6 text-on-surface placeholder:text-outline focus:outline-none"
               />
               <span className="self-end text-[12px] text-outline">
                 {details.length}/{MAX_DETAILS}

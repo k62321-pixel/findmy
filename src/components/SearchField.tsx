@@ -32,7 +32,7 @@ export function SearchField({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         aria-label="분실물 검색"
-        className="h-full w-full bg-transparent pl-10 pr-10 text-[15px] text-on-surface outline-none placeholder:text-outline"
+        className="h-full w-full bg-transparent pl-10 pr-10 text-[16px] text-on-surface outline-none placeholder:text-outline"
       />
       {value ? (
         <button

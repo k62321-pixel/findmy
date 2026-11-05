@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Icon } from './Icon'
@@ -67,31 +67,14 @@ export function AppHeader({ title, back = false, actions = true }: AppHeaderProp
 
         {actions ? (
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-            <button type="button" onClick={openInquiry} className={HEADER_BUTTON}>
-              문의사항
+            {/* Icon-only on phones so the school name keeps its room. */}
+            <button type="button" onClick={openInquiry} aria-label="문의사항" className={`${HEADER_BUTTON} max-sm:w-9 max-sm:justify-center max-sm:px-0`}>
+              <Icon name="support_agent" size={20} className="sm:hidden" />
+              <span className="hidden sm:inline">문의사항</span>
             </button>
 
             {user ? (
-              <div className="flex items-center gap-2">
-                {user.picture ? (
-                  <img
-                    src={user.picture}
-                    alt={user.name}
-                    referrerPolicy="no-referrer"
-                    className="h-8 w-8 rounded-full object-cover"
-                  />
-                ) : (
-                  <div
-                    aria-hidden="true"
-                    className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-container font-label-sm text-label-sm text-on-primary-container"
-                  >
-                    {user.name.slice(0, 1)}
-                  </div>
-                )}
-                <button type="button" onClick={() => logout()} className={HEADER_BUTTON}>
-                  로그아웃
-                </button>
-              </div>
+              <ProfileMenu name={user.name} email={user.email} picture={user.picture} onLogout={logout} />
             ) : (
               <button type="button" onClick={() => navigate('/login')} className={HEADER_BUTTON}>
                 <span className="sm:hidden">로그인</span>
@@ -104,6 +87,96 @@ export function AppHeader({ title, back = false, actions = true }: AppHeaderProp
       {/* Portaled: the header's backdrop-filter would otherwise confine the fixed overlay. */}
       {inquiring ? createPortal(<InquiryDialog onClose={() => setInquiring(false)} />, document.body) : null}
     </header>
+  )
+}
+
+/**
+ * Signed-in account: one avatar button at the far right that opens a small menu,
+ * instead of an avatar wedged between the header buttons.
+ */
+function ProfileMenu({
+  name,
+  email,
+  picture,
+  onLogout,
+}: {
+  name: string
+  email: string
+  picture?: string
+  onLogout: () => Promise<void>
+}) {
+  const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: MouseEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  const avatar = picture ? (
+    <img src={picture} alt="" referrerPolicy="no-referrer" className="h-full w-full rounded-full object-cover" />
+  ) : (
+    <span className="flex h-full w-full items-center justify-center rounded-full bg-on-surface text-[14px] font-bold text-white">
+      {name.slice(0, 1)}
+    </span>
+  )
+
+  const item = 'flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-[14px] text-on-surface hover:bg-surface-container-low'
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-label="내 계정 메뉴"
+        className="flex h-9 w-9 items-center justify-center rounded-full border border-outline-variant p-0.5 transition-colors hover:border-outline sm:h-11 sm:w-11"
+      >
+        {avatar}
+      </button>
+
+      {open ? (
+        <div className="absolute right-0 top-full z-50 mt-2 w-60 overflow-hidden rounded-md border border-outline-variant bg-surface-container-lowest py-1 shadow-level2">
+          <div className="flex items-center gap-3 border-b border-outline-variant px-4 py-3">
+            <span className="h-10 w-10 shrink-0">{avatar}</span>
+            <div className="flex min-w-0 flex-col">
+              <span className="truncate text-[15px] font-bold text-on-surface">{name}</span>
+              <span className="truncate text-[12px] text-outline">{email}</span>
+            </div>
+          </div>
+          <Link to="/my-items" onClick={() => setOpen(false)} className={item}>
+            <Icon name="inventory_2" size={20} className="text-outline" />내 물건
+          </Link>
+          <Link to="/saved" onClick={() => setOpen(false)} className={item}>
+            <Icon name="favorite" size={20} className="text-outline" />찜한 물건
+          </Link>
+          <Link to="/chats" onClick={() => setOpen(false)} className={item}>
+            <Icon name="forum" size={20} className="text-outline" />채팅
+          </Link>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false)
+              void onLogout()
+            }}
+            className={`${item} border-t border-outline-variant`}
+          >
+            <Icon name="logout" size={20} className="text-outline" />로그아웃
+          </button>
+        </div>
+      ) : null}
+    </div>
   )
 }
 

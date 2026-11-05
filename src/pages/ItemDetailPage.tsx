@@ -9,7 +9,7 @@ import { LoadError } from '../components/LoadError'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 import { categoryOf } from '../lib/categories'
 import { openChat } from '../lib/chat'
-import { addRecentlyViewed } from '../lib/recent'
+import { addRecentlyViewed, toggleSaved, useSavedItems } from '../lib/recent'
 import { formatFoundAt, formatFoundDate, formatRelative } from '../lib/format'
 import { useAuth } from '../store/AuthProvider'
 import { useItems } from '../store/ItemsProvider'
@@ -28,6 +28,7 @@ export function ItemDetailPage() {
   const [openingChat, setOpeningChat] = useState(false)
   const item = getItem(id)
   const found = !!item
+  const savedIds = useSavedItems()
 
   useEffect(() => {
     if (found) addRecentlyViewed(id)
@@ -104,6 +105,8 @@ export function ItemDetailPage() {
     }
   }
 
+  const saved = savedIds.includes(item.id)
+
   const actions = (
     <div className="flex flex-col gap-2">
       {error && !claiming ? (
@@ -113,13 +116,24 @@ export function ItemDetailPage() {
         </p>
       ) : null}
       <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => toggleSaved(item.id)}
+          aria-pressed={saved}
+          aria-label={saved ? '찜 해제' : '찜하기'}
+          className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded border border-outline-variant text-[11px] font-semibold text-on-surface-variant transition-colors hover:bg-surface-container-low"
+        >
+          <Icon name="favorite" size={24} filled={saved} className={saved ? 'text-primary' : 'text-outline'} />
+          찜
+        </button>
         {item.reportedByMe ? (
           <Link
             to="/chats"
             className="flex h-14 flex-1 items-center justify-center gap-1.5 rounded bg-inverse-surface text-[16px] font-bold text-inverse-on-surface"
           >
             <Icon name="forum" />
-            받은 채팅 보기
+            <span className="sm:hidden">받은 채팅</span>
+            <span className="hidden sm:inline">받은 채팅 보기</span>
           </Link>
         ) : item.status !== 'returned' ? (
           <button
@@ -129,7 +143,8 @@ export function ItemDetailPage() {
             className="flex h-14 flex-1 items-center justify-center gap-1.5 rounded bg-inverse-surface text-[16px] font-bold text-inverse-on-surface transition-opacity disabled:opacity-60"
           >
             <Icon name="chat" />
-            습득자와 채팅
+            <span className="sm:hidden">채팅하기</span>
+            <span className="hidden sm:inline">습득자와 채팅</span>
           </button>
         ) : null}
         <div className="min-w-0 flex-1">

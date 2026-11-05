@@ -103,7 +103,7 @@ export function UsageBanner({ className = '' }: { className?: string }) {
             {/* Oversized single-colour glyph cropped by the edge — a graphic, not a sticker. */}
             <span
               aria-hidden="true"
-              className="pointer-events-none absolute -bottom-10 -right-6 origin-bottom-right scale-[0.5] opacity-[0.16] sm:scale-[0.7] md:-bottom-16 md:right-16 md:scale-100"
+              className="pointer-events-none absolute -bottom-10 -right-6 origin-bottom-right scale-[0.6] opacity-[0.16] sm:scale-[0.7] md:-bottom-16 md:right-16 md:scale-100"
             >
               <Icon name={slide.art} size={360} filled />
             </span>
@@ -112,16 +112,16 @@ export function UsageBanner({ className = '' }: { className?: string }) {
               <span className="w-fit rounded-full border border-current px-2 py-px text-[11px] font-bold tracking-wider opacity-70 md:px-3 md:py-0.5 md:text-[14px]">
                 STEP {i + 1}
               </span>
-              <p className="whitespace-pre-line break-keep text-[19px] font-extrabold leading-[1.3] tracking-tight sm:text-[26px] md:text-[40px]">
+              <p className="whitespace-pre-line break-keep text-[24px] font-extrabold leading-[1.3] tracking-tight sm:text-[28px] md:text-[40px]">
                 {slide.title}
               </p>
-              <p className="text-[13px] font-semibold opacity-75 sm:text-[15px] md:text-[20px]">{slide.sub}</p>
+              <p className="text-[15px] font-semibold opacity-75 sm:text-[16px] md:text-[20px]">{slide.sub}</p>
               {slide.cta ? (
                 slide.cta.to.startsWith('#') ? (
                   <a
                     href={slide.cta.to}
                     tabIndex={i === index ? 0 : -1}
-                    className="mt-1 flex w-fit items-center text-[13px] font-bold sm:text-[15px] md:text-[20px]"
+                    className="mt-2 flex w-fit items-center text-[15px] font-bold sm:text-[16px] md:text-[20px]"
                   >
                     {slide.cta.label}
                     <Icon name="chevron_right" size={20} />
@@ -130,7 +130,7 @@ export function UsageBanner({ className = '' }: { className?: string }) {
                   <Link
                     to={slide.cta.to}
                     tabIndex={i === index ? 0 : -1}
-                    className="mt-1 flex w-fit items-center text-[13px] font-bold sm:text-[15px] md:text-[20px]"
+                    className="mt-2 flex w-fit items-center text-[15px] font-bold sm:text-[16px] md:text-[20px]"
                   >
                     {slide.cta.label}
                     <Icon name="chevron_right" size={20} />
