@@ -9,7 +9,6 @@ import { StatusChip } from '../components/StatusChip'
 import { getChat, sendChatMessage, usePolling } from '../lib/chat'
 import { formatFoundAt } from '../lib/format'
 import type { ChatMessage, ChatSummary } from '../types'
-import { chatCounterpart } from './ChatListPage'
 
 const MAX_LENGTH = 500
 const POLL_MS = 4_000
@@ -95,7 +94,7 @@ export function ChatRoomPage() {
   const canSend = chat.myRole !== 'observer' && !chat.closed
 
   return (
-    <AppShell title={chatCounterpart(chat)} back headerActions={false} nav={false}>
+    <AppShell title="채팅방" back headerActions={false} nav={false}>
       <div className="flex flex-col gap-4 px-margin-mobile pb-40 pt-4 md:px-margin-desktop">
         <Link
           to={`/items/${chat.itemId}`}
@@ -127,16 +126,21 @@ export function ChatRoomPage() {
           </p>
         ) : (
           <ol className="flex flex-col gap-2">
-            {messages.map((m, i) => (
-              <MessageBubble
-                key={m.id}
-                message={m}
-                observer={chat.myRole === 'observer'}
-                askerName={chat.askerName}
-                reporterName={chat.reporterName}
-                showTime={i === messages.length - 1 || messages[i + 1].mine !== m.mine}
-              />
-            ))}
+            {messages.map((m, i) => {
+              const prev = messages[i - 1]
+              const next = messages[i + 1]
+              return (
+                <MessageBubble
+                  key={m.id}
+                  message={m}
+                  observer={chat.myRole === 'observer'}
+                  senderName={m.senderRole === 'reporter' ? chat.reporterName : chat.askerName}
+                  // Profile once at the start of each run of messages from the same person.
+                  showProfile={!prev || prev.senderRole !== m.senderRole}
+                  showTime={!next || next.senderRole !== m.senderRole}
+                />
+              )
+            })}
           </ol>
         )}
         <div ref={bottomRef} />
@@ -192,37 +196,54 @@ export function ChatRoomPage() {
 function MessageBubble({
   message,
   observer,
-  askerName,
-  reporterName,
+  senderName,
+  showProfile,
   showTime,
 }: {
   message: ChatMessage
   observer: boolean
-  askerName: string
-  reporterName: string
+  senderName: string
+  showProfile: boolean
   showTime: boolean
 }) {
-  // Admins see the conversation from the finder's side, labelled with names.
+  // Admins see the conversation from the finder's side; both sides get a profile then.
   const right = observer ? message.senderRole === 'reporter' : message.mine
+  const withProfile = observer || !message.mine
+  const role = message.senderRole === 'reporter' ? '습득자' : '문의자'
+
   return (
-    <li className={`flex flex-col gap-1 ${right ? 'items-end' : 'items-start'}`}>
-      {observer ? (
-        <span className="font-label-sm text-label-sm text-outline">
-          {message.senderRole === 'reporter' ? `습득자 ${reporterName}` : `문의자 ${askerName}`}
-        </span>
+    <li className={`flex gap-2 ${right ? 'flex-row-reverse' : 'flex-row'} ${showProfile ? 'mt-2' : ''}`}>
+      {withProfile ? (
+        showProfile ? (
+          <span
+            aria-hidden="true"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-container font-label-sm text-label-sm text-on-primary-container"
+          >
+            {senderName.slice(0, 1)}
+          </span>
+        ) : (
+          <span aria-hidden="true" className="w-8 shrink-0" />
+        )
       ) : null}
-      <p
-        className={`max-w-[80%] whitespace-pre-wrap break-words rounded-lg px-4 py-2 font-body-md text-body-md ${
-          right
-            ? 'rounded-br-sm bg-primary text-on-primary'
-            : 'rounded-bl-sm bg-surface-container-high text-on-surface'
-        }`}
-      >
-        {message.content}
-      </p>
-      {showTime ? (
-        <span className="font-label-sm text-label-sm text-outline">{formatFoundAt(message.createdAt)}</span>
-      ) : null}
+      <div className={`flex min-w-0 max-w-[80%] flex-col gap-1 ${right ? 'items-end' : 'items-start'}`}>
+        {withProfile && showProfile ? (
+          <span className="font-label-sm text-[11px] leading-none text-on-surface-variant">
+            {senderName} <span className="text-outline">· {role}</span>
+          </span>
+        ) : null}
+        <p
+          className={`whitespace-pre-wrap break-words rounded-lg px-4 py-2 font-body-md text-body-md ${
+            right
+              ? 'rounded-br-sm bg-primary text-on-primary'
+              : 'rounded-bl-sm bg-surface-container-high text-on-surface'
+          }`}
+        >
+          {message.content}
+        </p>
+        {showTime ? (
+          <span className="font-label-sm text-label-sm text-outline">{formatFoundAt(message.createdAt)}</span>
+        ) : null}
+      </div>
     </li>
   )
 }
